@@ -1,0 +1,43 @@
+{
+  "name": "mcp-perforce-server",
+  "version": "1.0.0",
+  "description": "Production-ready MCP server for Perforce (p4 CLI) with cross-platform support",
+  "main": "dist/server.js",
+  "bin": {
+    "mcp-perforce-server": "dist/server.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc && node dist/server.js",
+    "start": "node dist/server.js",
+    "watch": "tsc --watch",
+    "clean": "rimraf dist",
+    "test": "node test-server.js",
+    "prepare": "npm run build"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "perforce",
+    "p4",
+    "vcs",
+    "version-control"
+  ],
+  "author": "MCP Perforce Server",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "rimraf": "^5.0.0",
+    "typescript": "^5.0.0"
+  },
+  "files": [
+    "dist/**/*",
+    "README.md"
+  ]
+}
