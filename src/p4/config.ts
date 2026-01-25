@@ -180,7 +180,12 @@ export class P4Config {
     
     // Use project root as working directory if config found, otherwise use provided path
     const cwd = configResult.projectRoot || startPath;
-    const env = configResult.environment;
+    
+    // Merge .p4config environment with MCP-provided environment variables
+    const env = {
+      ...configResult.environment,
+      ...this.getMcpEnvironment(), // MCP environment takes precedence
+    };
     
     return { cwd, env, configResult };
   }
@@ -191,13 +196,21 @@ export class P4Config {
   validateEnvironment(configResult: P4ConfigResult): { valid: boolean; errors: string[] } {
     const errors: string[] = [];
     
-    if (!configResult.found) {
-      errors.push('No .p4config file found in current directory or parent directories');
+    // Get combined environment (MCP + .p4config)
+    const mcpEnv = this.getMcpEnvironment();
+    const hasAnyConfig = configResult.found || Object.keys(mcpEnv).length > 0;
+    
+    if (!hasAnyConfig) {
+      errors.push('No .p4config file found and no MCP environment variables provided');
     }
     
     const requiredKeys = ['P4PORT', 'P4USER', 'P4CLIENT'];
     for (const key of requiredKeys) {
-      if (!configResult.config[key] && !process.env[key]) {
+      const hasInConfig = configResult.config[key];
+      const hasInMcp = mcpEnv[key];
+      const hasInProcessEnv = process.env[key];
+      
+      if (!hasInConfig && !hasInMcp && !hasInProcessEnv) {
         errors.push(`Required configuration missing: ${key}`);
       }
     }
@@ -216,6 +229,27 @@ export class P4Config {
       readOnlyMode: process.env.P4_READONLY_MODE !== 'false', // Default: true
       disableDelete: process.env.P4_DISABLE_DELETE !== 'false', // Default: true
     };
+  }
+  
+  /**
+   * Extract MCP-provided Perforce environment variables
+   */
+  private getMcpEnvironment(): Record<string, string> {
+    const mcpEnv: Record<string, string> = {};
+    
+    // Standard Perforce environment variables that can be provided via MCP config
+    const p4Keys = [
+      'P4PORT', 'P4USER', 'P4CLIENT', 'P4CHARSET', 'P4PASSWD',
+      'P4COMMANDCHARSET', 'P4LANGUAGE', 'P4DIFF', 'P4MERGE', 'P4EDITOR'
+    ];
+    
+    for (const key of p4Keys) {
+      if (process.env[key]) {
+        mcpEnv[key] = process.env[key];
+      }
+    }
+    
+    return mcpEnv;
   }
   
   /**

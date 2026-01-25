@@ -104,6 +104,15 @@ export async function p4ConfigDetect(
     const configResult = await context.config.findConfig(startPath);
     const validation = context.config.validateEnvironment(configResult);
     
+    // Get MCP environment variables
+    const mcpEnv: Record<string, string> = {};
+    const p4Keys = ['P4PORT', 'P4USER', 'P4CLIENT', 'P4CHARSET', 'P4PASSWD'];
+    for (const key of p4Keys) {
+      if (process.env[key]) {
+        mcpEnv[key] = process.env[key];
+      }
+    }
+    
     const result: P4RunResult = {
       ok: true,
       command: 'config.detect',
@@ -119,11 +128,15 @@ export async function p4ConfigDetect(
         projectRoot: configResult.projectRoot,
         config: configResult.config,
         environment: configResult.environment,
+        mcpEnvironment: mcpEnv,
         validation: {
           valid: validation.valid,
           errors: validation.errors,
         },
         searchPath: startPath,
+        configurationSource: configResult.found ? '.p4config file' : 
+                           Object.keys(mcpEnv).length > 0 ? 'MCP environment variables' : 
+                           'none',
       },
     };
     
