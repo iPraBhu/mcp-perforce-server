@@ -7,12 +7,14 @@ import * as path from 'path';
 import * as os from 'os';
 import { P4Runner, P4RunResult } from '../p4/runner.js';
 import { P4Config, P4ServerConfig } from '../p4/config.js';
+import { SecurityManager } from '../p4/security.js';
 import * as parse from '../p4/parse.js';
 
 export interface ToolContext {
   runner: P4Runner;
   config: P4Config;
   serverConfig: P4ServerConfig;
+  security: SecurityManager;
 }
 
 /**

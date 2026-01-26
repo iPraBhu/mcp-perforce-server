@@ -32,6 +32,7 @@ export interface P4RunOptions {
   parseOutput?: boolean;
   useZtag?: boolean;
   useMarshalled?: boolean;
+  maxMemoryMB?: number;
 }
 
 export class P4Runner {
@@ -55,7 +56,26 @@ export class P4Runner {
       parseOutput = true,
       useZtag = false,
       useMarshalled = false,
+      maxMemoryMB = parseInt(process.env.P4_MAX_MEMORY_MB || '512'),
     } = options;
+
+    // Check memory limits before starting
+    const memUsage = process.memoryUsage();
+    const currentMemoryMB = memUsage.rss / 1024 / 1024;
+
+    if (currentMemoryMB > maxMemoryMB) {
+      return {
+        ok: false,
+        command: this.p4Path,
+        args: [command, ...args],
+        cwd,
+        configUsed: {},
+        error: {
+          code: 'P4_MEMORY_LIMIT',
+          message: `Memory limit exceeded: ${currentMemoryMB.toFixed(1)}MB > ${maxMemoryMB}MB`,
+        },
+      };
+    }
 
     // Build full command args
     const fullArgs: string[] = [];
