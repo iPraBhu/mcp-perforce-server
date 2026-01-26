@@ -63,6 +63,10 @@
   },
   "license": "MIT",
   "author": "Pratik Bhuite (https://github.com/iPraBhu)",
+  "funding": {
+    "type": "ko-fi",
+    "url": "https://ko-fi.com/adevguide"
+  },
   "type": "commonjs",
   "types": "./dist/server.d.ts",
   "files": [

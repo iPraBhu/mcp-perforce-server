@@ -217,6 +217,12 @@ This project was created with ❤️ by [Pratik Bhuite](https://github.com/iPraB
 
 **Found this useful?** Consider giving it a star ⭐ and sharing with others who might benefit!
 
+## Support This Project
+
+☕ **Enjoying this tool?** [Buy me a coffee on Ko-fi](https://ko-fi.com/adevguide) to support continued development and new features!
+
+[![Ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/adevguide)
+
 ## Security
 
 This project follows security best practices:
