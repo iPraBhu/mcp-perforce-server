@@ -217,6 +217,14 @@ This project was created with ❤️ by [Pratik Bhuite](https://github.com/iPraB
 
 **Found this useful?** Consider giving it a star ⭐ and sharing with others who might benefit!
 
+## Security
+
+This project follows security best practices:
+- 🔒 **Dependencies**: Regularly updated to latest secure versions
+- 🛡️ **Default Safety**: Read-only mode and delete protection by default  
+- 🔍 **Audit**: Run `npm run audit-fix` to check for vulnerabilities
+- 📢 **Report Issues**: Security issues? Please report privately via GitHub
+
 ## License
 
 MIT License - Feel free to use, modify, and distribute as needed. See [LICENSE](LICENSE) for details.

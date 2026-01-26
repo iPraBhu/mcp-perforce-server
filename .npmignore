@@ -5,6 +5,7 @@ src/
 tsconfig.json
 test-*.js
 examples.js
+.nvmrc
 
 # Development files
 .git/
