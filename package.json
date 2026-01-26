@@ -97,7 +97,8 @@
     "LICENSE"
   ],
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.25.3"
+    "@modelcontextprotocol/sdk": "^1.25.3",
+    "mcp-perforce-server": "^2.0.0"
   },
   "devDependencies": {
     "@types/node": "^25.0.10",
@@ -108,7 +109,6 @@
     "node": ">=18.0.0"
   },
   "publishConfig": {
-    "access": "public",
-    "registry": "https://npm.pkg.github.com"
+    "access": "public"
   }
 }
