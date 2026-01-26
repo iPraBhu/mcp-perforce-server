@@ -1,6 +1,6 @@
 {
   "name": "mcp-perforce-server",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Enterprise-grade MCP (Model Context Protocol) server for Perforce P4 integration with AI assistants like Claude, ChatGPT, and VS Code. Created by Pratik Bhuite using vibe coding to solve real-world Perforce automation challenges. Open source, customizable, and community-driven.",
   "main": "dist/server.js",
   "bin": {
@@ -64,28 +64,13 @@
   "license": "MIT",
   "author": "Pratik Bhuite (https://github.com/iPraBhu)",
   "type": "commonjs",
-  "main": "dist/server.js",
   "types": "./dist/server.d.ts",
-  "bin": {
-    "mcp-perforce-server": "dist/server.js"
-  },
   "files": [
     "dist/**/*",
     "README.md",
     "MCP_CONFIG_EXAMPLES.md",
     "LICENSE"
   ],
-  "scripts": {
-    "build": "tsc",
-    "dev": "tsc && node dist/server.js",
-    "start": "node dist/server.js",
-    "watch": "tsc --watch",
-    "clean": "rimraf dist",
-    "test": "node test-server.js",
-    "prepare": "npm run build",
-    "prepublishOnly": "npm run clean && npm run build",
-    "audit-fix": "npm audit fix"
-  },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.2"
   },
