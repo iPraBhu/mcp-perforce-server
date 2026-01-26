@@ -118,7 +118,7 @@ Production-ready server that exposes **37+ Perforce VCS operations** through the
 
 ## Origin Story
 
-This project was born from a real need! I ([Pratik Bhuite](https://github.com/iPraBhu)) was facing challenges integrating Perforce with AI development tools and decided to solve it using **vibe coding** - building something that just works, feels right, and solves real problems.
+This project was born from a real need! I was facing challenges integrating Perforce with AI development tools and decided to solve it using **vibe coding** - building something that just works, feels right, and solves real problems.
 
 **🤝 Community Welcome**
 - ✅ **Use freely** - This is open source, use it however you need
