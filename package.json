@@ -17,23 +17,6 @@
     "prepublishOnly": "npm run clean && npm run build",
     "audit-fix": "npm audit fix"
   },
-=======
->>>>>>> 738f8be (WIP: push local changes before pulling from server)
-    "main": "dist/server.js",
-    "bin": {
-      "mcp-perforce-server": "dist/server.js"
-    },
-    "scripts": {
-      "build": "tsc",
-      "dev": "tsc && node dist/server.js",
-      "start": "node dist/server.js",
-      "watch": "tsc --watch",
-      "clean": "rimraf dist",
-      "test": "node test-server.js",
-      "prepare": "npm run build",
-      "prepublishOnly": "npm run clean && npm run build",
-      "audit-fix": "npm audit fix"
-    },
   "keywords": [
     "mcp",
     "model-context-protocol",
@@ -100,7 +83,8 @@
     "clean": "rimraf dist",
     "test": "node test-server.js",
     "prepare": "npm run build",
-    "prepublishOnly": "npm run clean && npm run build"
+    "prepublishOnly": "npm run clean && npm run build",
+    "audit-fix": "npm audit fix"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.2"
