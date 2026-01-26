@@ -1,6 +1,6 @@
 {
   "name": "mcp-perforce-server",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Enterprise-grade MCP (Model Context Protocol) server for Perforce P4 integration with AI assistants like Claude, ChatGPT, and VS Code. Created by Pratik Bhuite using vibe coding to solve real-world Perforce automation challenges. Open source, customizable, and community-driven.",
   "main": "dist/server.js",
   "bin": {
