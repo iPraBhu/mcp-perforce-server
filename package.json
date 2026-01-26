@@ -97,8 +97,7 @@
     "LICENSE"
   ],
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.25.3",
-    "mcp-perforce-server": "^2.0.0"
+    "@modelcontextprotocol/sdk": "^1.25.3"
   },
   "devDependencies": {
     "@types/node": "^25.0.10",

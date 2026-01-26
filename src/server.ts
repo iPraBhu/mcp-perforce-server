@@ -1165,10 +1165,18 @@ class MCPPerforceServer {
 
 // Start the server
 if (require.main === module) {
+  const packageJson = require('../package.json');
+
+  // Handle version flag
+  if (process.argv.includes('--version') || process.argv.includes('-v')) {
+    console.log(packageJson.version);
+    process.exit(0);
+  }
+
   // Handle help flag
   if (process.argv.includes('--help') || process.argv.includes('-h')) {
     console.log(`
-MCP Perforce Server v1.0.0
+MCP Perforce Server v${packageJson.version}
 ===========================
 
 A production-ready MCP (Model Context Protocol) server for Perforce operations.
@@ -1176,6 +1184,7 @@ A production-ready MCP (Model Context Protocol) server for Perforce operations.
 Usage:
   mcp-perforce-server          Start the MCP server (stdio transport)
   mcp-perforce-server --help   Show this help message
+  mcp-perforce-server --version Show version information
 
 Environment Variables:
   P4_READONLY_MODE=false      Enable write operations (default: true)
