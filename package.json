@@ -1,6 +1,6 @@
 {
   "name": "mcp-perforce-server",
-  "version": "1.2.1",
+  "version": "1.2.2",
   "description": "Enterprise-grade MCP (Model Context Protocol) server for Perforce P4 integration with AI assistants. Features 37+ Perforce operations including merge resolution, shelving, advanced search, blame annotations, and comprehensive security with audit logging, rate limiting, input sanitization, and compliance reporting. SOC 2 ready with GDPR/HIPAA-friendly architecture. Created by Pratik Bhuite using vibe coding to solve real-world Perforce automation challenges. Open source, production-ready, and enterprise-compliant.",
   "main": "dist/server.js",
   "bin": {
