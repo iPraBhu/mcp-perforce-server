@@ -1,4 +1,4 @@
-import { spawn, SpawnOptionsWithoutStdio } from 'child_process';
+import { spawn, SpawnOptions } from 'child_process';
 import * as path from 'path';
 import * as os from 'os';
 
@@ -126,11 +126,13 @@ export class P4Runner {
     options: { cwd: string; env: Record<string, string | undefined>; timeout: number }
   ): Promise<{ stdout: string; stderr: string; exitCode: number }> {
     return new Promise((resolve, reject) => {
-      const spawnOptions: SpawnOptionsWithoutStdio = {
+      const spawnOptions: SpawnOptions = {
         cwd: options.cwd,
         env: options.env,
         shell: false, // Critical: avoid shell on Windows
         windowsHide: true,
+        stdio: ['ignore', 'pipe', 'pipe'], // Hide stdin, capture stdout/stderr
+        detached: false, // Keep attached to parent process
       };
 
       const child = spawn(this.p4Path, args, spawnOptions);

@@ -1,4 +1,13 @@
-# MCP Configuration Examples for Popular IDEs
+# MCP Perforce Server Configuration Examples
+
+## Silent Operation Configuration
+
+To prevent VS Code from asking for approval on every command and to hide terminal execution:
+
+**Key Settings:**
+- `"alwaysAllow": ["p4.*"]` or `"alwaysAllow": true` - Auto-approve all p4 commands
+- `"LOG_LEVEL": "error"` - Minimize console output (only show errors)
+- `"disabled": false` - Ensure server is enabled
 
 ## VS Code with Claude Dev/Cline
 
@@ -13,8 +22,10 @@ Create a `.p4config` file in your project root, then:
       "env": {
         "P4_READONLY_MODE": "false",
         "P4_DISABLE_DELETE": "true",
-        "LOG_LEVEL": "warn"
-      }
+        "LOG_LEVEL": "error"
+      },
+      "alwaysAllow": ["p4.*"],
+      "disabled": false
     }
   }
 }
@@ -34,8 +45,10 @@ Create a `.p4config` file in your project root, then:
         "P4CHARSET": "utf8",
         "P4_READONLY_MODE": "false",
         "P4_DISABLE_DELETE": "true",
-        "LOG_LEVEL": "warn"
-      }
+        "LOG_LEVEL": "error"
+      },
+      "alwaysAllow": ["p4.*"],
+      "disabled": false
     }
   }
 }
@@ -53,8 +66,10 @@ Create a `.p4config` file in your project root, then:
         "args": [],
         "env": {
           "P4_READONLY_MODE": "false", 
-          "P4_DISABLE_DELETE": "true"
-        }
+          "P4_DISABLE_DELETE": "true",
+          "LOG_LEVEL": "error"
+        },
+        "alwaysAllow": true
       }
     }
   }
@@ -74,8 +89,10 @@ Create a `.p4config` file in your project root, then:
           "P4USER": "your-username", 
           "P4CLIENT": "your-workspace-name",
           "P4_READONLY_MODE": "false",
-          "P4_DISABLE_DELETE": "true"
-        }
+          "P4_DISABLE_DELETE": "true",
+          "LOG_LEVEL": "error"
+        },
+        "alwaysAllow": true
       }
     }
   }
@@ -96,8 +113,10 @@ Create a `.p4config` file in your project root, then:
       "args": [],
       "env": {
         "P4_READONLY_MODE": "false",
-        "P4_DISABLE_DELETE": "true"
-      }
+        "P4_DISABLE_DELETE": "true",
+        "LOG_LEVEL": "error"
+      },
+      "alwaysAllow": ["p4.*"]
     }
   }
 }
@@ -115,8 +134,10 @@ Create a `.p4config` file in your project root, then:
         "P4USER": "your-username",
         "P4CLIENT": "your-workspace-name", 
         "P4_READONLY_MODE": "false",
-        "P4_DISABLE_DELETE": "true"
-      }
+        "P4_DISABLE_DELETE": "true",
+        "LOG_LEVEL": "error"
+      },
+      "alwaysAllow": ["p4.*"]
     }
   }
 }
@@ -154,6 +175,24 @@ Replace the "command" field with the full path to your built server:
   }
 }
 ```
+
+## Configuration Notes
+
+### Silent Operation
+- `"alwaysAllow": ["p4.*"]` - Auto-approves all p4 commands, preventing VS Code approval prompts
+- `"alwaysAllow": true` - Auto-approves all commands (Cursor)
+- `"LOG_LEVEL": "error"` - Reduces console output to errors only
+- `"disabled": false` - Ensures the server is active
+
+### Security Levels
+- **Safe**: `P4_READONLY_MODE=true, P4_DISABLE_DELETE=true` (read-only)
+- **Recommended**: `P4_READONLY_MODE=false, P4_DISABLE_DELETE=true` (write, no delete)  
+- **Full Access**: `P4_READONLY_MODE=false, P4_DISABLE_DELETE=false` (use with caution)
+
+### Troubleshooting
+- If commands still show approval prompts, ensure `alwaysAllow` is configured
+- If you see terminal output, set `LOG_LEVEL` to `"error"`
+- Commands execute silently in the background without terminal windows
 
 ### Full Access (Use with Caution)
 ```json

@@ -100,6 +100,23 @@ P4_READONLY_MODE=false P4_DISABLE_DELETE=false
 ## Integration
 
 ### VS Code / Cursor
+For silent operation without approval prompts, add these settings:
+```json
+{
+  "mcpServers": {
+    "perforce": {
+      "command": "mcp-perforce-server",
+      "env": {
+        "P4_READONLY_MODE": "false",
+        "LOG_LEVEL": "error"
+      },
+      "alwaysAllow": ["p4.*"],
+      "disabled": false
+    }
+  }
+}
+```
+
 See [MCP_CONFIG_EXAMPLES.md](MCP_CONFIG_EXAMPLES.md) for IDE-specific configuration.
 
 ### Claude Desktop
