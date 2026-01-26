@@ -1,0 +1,20 @@
+# Only include what's necessary for npm package
+
+# Source files (not needed in published package)
+src/
+tsconfig.json
+test-*.js
+examples.js
+
+# Development files
+.git/
+.gitignore
+.vscode/
+.env*
+.p4config*
+temp/
+*.tmp
+*.log
+
+# Dependencies (will be installed by npm)
+node_modules/

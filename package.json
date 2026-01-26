@@ -1,7 +1,7 @@
 {
   "name": "mcp-perforce-server",
   "version": "1.0.0",
-  "description": "Production-ready MCP server for Perforce (p4 CLI) with cross-platform support",
+  "description": "Enterprise-grade MCP (Model Context Protocol) server for Perforce P4 integration with AI assistants like Claude, ChatGPT, and VS Code. Created by Pratik Bhuite using vibe coding to solve real-world Perforce automation challenges. Open source, customizable, and community-driven.",
   "main": "dist/server.js",
   "bin": {
     "mcp-perforce-server": "dist/server.js"
@@ -13,20 +13,63 @@
     "watch": "tsc --watch",
     "clean": "rimraf dist",
     "test": "node test-server.js",
-    "prepare": "npm run build"
+    "prepare": "npm run build",
+    "prepublishOnly": "npm run clean && npm run build"
   },
   "keywords": [
     "mcp",
     "model-context-protocol",
     "perforce",
     "p4",
+    "p4v",
     "vcs",
-    "version-control"
+    "version-control",
+    "ai",
+    "automation",
+    "claude",
+    "chatgpt",
+    "vscode",
+    "cursor",
+    "anthropic",
+    "openai",
+    "git",
+    "scm",
+    "devops",
+    "enterprise",
+    "developer-tools",
+    "code-assistant",
+    "ai-integration",
+    "workflow-automation",
+    "typescript",
+    "cross-platform",
+    "windows",
+    "macos",
+    "linux",
+    "production-ready",
+    "secure",
+    "open-source",
+    "community",
+    "customizable",
+    "vibe-coding"
   ],
-  "author": "MCP Perforce Server",
+  "author": {
+    "name": "Pratik Bhuite",
+    "url": "https://github.com/iPraBhu"
+  },
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/iPraBhu/mcp-perforce-server.git"
+  },
+  "bugs": {
+    "url": "https://github.com/iPraBhu/mcp-perforce-server/issues"
+  },
+  "homepage": "https://github.com/iPraBhu/mcp-perforce-server#readme",
   "engines": {
     "node": ">=18.0.0"
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.0"
@@ -38,6 +81,8 @@
   },
   "files": [
     "dist/**/*",
-    "README.md"
+    "README.md",
+    "MCP_CONFIG_EXAMPLES.md",
+    "LICENSE"
   ]
 }

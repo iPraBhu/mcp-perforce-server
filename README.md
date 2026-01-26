@@ -1,17 +1,51 @@
 # MCP Perforce Server
 
-Enterprise-grade MCP (Model Context Protocol) server providing secure, non-interactive Perforce operations for AI-assisted development workflows.
+[![npm version](https://badge.fury.io/js/mcp-perforce-server.svg)](https://www.npmjs.com/package/mcp-perforce-server)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Node.js Version](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen)](https://nodejs.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-Ready-blue)](https://www.typescriptlang.org/)
+
+Enterprise-grade MCP (Model Context Protocol) server providing secure, non-interactive Perforce operations for AI-assisted development workflows with Claude, ChatGPT, VS Code, and Cursor IDE.
+
+> **Created by [Pratik Bhuite](https://github.com/iPraBhu)** using vibe coding to solve real-world Perforce automation challenges. Open source, community-driven, and ready for customization!
 
 ## Overview
 
-Production-ready server that exposes Perforce VCS operations through the Model Context Protocol, enabling AI assistants to interact with Perforce repositories safely and efficiently.
+Production-ready server that exposes Perforce VCS operations through the Model Context Protocol, enabling AI assistants and code editors to interact with Perforce repositories safely and efficiently. Perfect for DevOps automation, enterprise development workflows, and AI-powered version control management.
 
 **Key Features:**
-- Cross-platform support (Windows, macOS, Linux)  
-- Non-interactive operation with comprehensive error handling
-- Multi-project support via automatic `.p4config` detection
-- Security-first design with read-only defaults
-- Structured JSON responses with standardized schemas
+- 🔒 **Enterprise Security** - Read-only defaults with configurable access controls
+- 🌐 **Cross-platform Support** - Windows, macOS, Linux compatibility
+- 🤖 **AI Integration** - Works with Claude, ChatGPT, VS Code, Cursor, and other AI assistants
+- ⚡ **Non-interactive Operations** - Automated Perforce commands with comprehensive error handling
+- 📁 **Multi-project Support** - Automatic `.p4config` detection with upward directory search
+- 🛡️ **Production Ready** - Structured JSON responses with standardized error codes
+- 🔧 **Developer Friendly** - TypeScript support with comprehensive documentation
+- 🚀 **Zero Configuration** - Works out-of-the-box with sensible defaults
+
+## Why Choose MCP Perforce Server?
+
+**Alternative to:**
+- Manual Perforce CLI operations in AI workflows
+- Custom Git-to-Perforce bridges for AI assistants
+- Unsafe direct P4 command execution in development environments
+- Complex Perforce API integrations for code assistants
+
+**Perfect for:**
+- Enterprise teams using Perforce with AI development tools
+- DevOps automation with Anthropic Claude or OpenAI ChatGPT
+- VS Code and Cursor IDE users working with Perforce repositories  
+- Secure version control operations in AI-assisted coding workflows
+
+## Origin Story
+
+This project was born from a real need! I ([Pratik Bhuite](https://github.com/iPraBhu)) was facing challenges integrating Perforce with AI development tools and decided to solve it using **vibe coding** - building something that just works, feels right, and solves real problems.
+
+**🤝 Community Welcome**
+- ✅ **Use freely** - This is open source, use it however you need
+- 🐛 **Report issues** - Found a bug? Please let me know!
+- 🔧 **Customize** - Fork it, modify it, make it yours
+- 💡 **Contribute** - Ideas, PRs, and feedback are always welcome
 
 ## Installation
 
@@ -158,7 +192,7 @@ Standardized error codes for reliable error handling:
 
 ```bash
 # Local development
-git clone <repository-url>
+git clone https://github.com/iPraBhu/mcp-perforce-server.git
 cd mcp-perforce-server
 npm install
 npm run build
@@ -170,6 +204,21 @@ npm test
 npm run watch
 ```
 
+## Contributing
+
+This project was created with ❤️ by [Pratik Bhuite](https://github.com/iPraBhu) to solve real Perforce automation challenges. 
+
+**Ways to contribute:**
+- 🐛 **Report bugs** - Open an issue if something's not working
+- 💡 **Suggest features** - Have an idea? Let's discuss it!
+- 🔧 **Submit PRs** - Code contributions are welcome
+- 📖 **Improve docs** - Help make the documentation better
+- ⭐ **Star the repo** - Show your support!
+
+**Found this useful?** Consider giving it a star ⭐ and sharing with others who might benefit!
+
 ## License
 
-MIT License
+MIT License - Feel free to use, modify, and distribute as needed. See [LICENSE](LICENSE) for details.
+
+**TL;DR:** Use it however you want, just keep the license notice. Built for the community! 🚀
