@@ -9,6 +9,22 @@ To prevent VS Code from asking for approval on every command and to hide termina
 - `"LOG_LEVEL": "error"` - Minimize console output (only show errors)
 - `"disabled": false` - Ensure server is enabled
 
+## Authentication Configuration
+
+**Important:** Configure your Perforce credentials using one of these methods:
+
+1. **`.p4config` file** (Recommended) - Create in project root:
+   ```
+   P4PORT=perforce-server:1666
+   P4USER=your-username
+   P4CLIENT=your-workspace-name
+   P4PASSWD=your-password
+   ```
+
+2. **Environment variables** in MCP config (see examples below)
+
+The server automatically detects and uses these credentials. Passwords are masked in logs for security.
+
 ## VS Code with Claude Dev/Cline
 
 ### Option 1: Using .p4config file (Recommended)
@@ -42,6 +58,7 @@ Create a `.p4config` file in your project root, then:
         "P4PORT": "perforce-server:1666",
         "P4USER": "your-username",
         "P4CLIENT": "your-workspace-name",
+        "P4PASSWD": "your-password",
         "P4CHARSET": "utf8",
         "P4_READONLY_MODE": "false",
         "P4_DISABLE_DELETE": "true",
@@ -88,6 +105,7 @@ Create a `.p4config` file in your project root, then:
           "P4PORT": "perforce-server:1666",
           "P4USER": "your-username", 
           "P4CLIENT": "your-workspace-name",
+          "P4PASSWD": "your-password",
           "P4_READONLY_MODE": "false",
           "P4_DISABLE_DELETE": "true",
           "LOG_LEVEL": "error"

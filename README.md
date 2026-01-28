@@ -143,6 +143,7 @@ npm install -g mcp-perforce-server
    P4PORT=your-perforce-server:1666
    P4USER=your-username
    P4CLIENT=your-workspace-name
+   P4PASSWD=your-password
    ```
 
    **Method B: MCP Environment Variables**
@@ -154,7 +155,8 @@ npm install -g mcp-perforce-server
          "env": {
            "P4PORT": "your-perforce-server:1666",
            "P4USER": "your-username", 
-           "P4CLIENT": "your-workspace-name"
+           "P4CLIENT": "your-workspace-name",
+           "P4PASSWD": "your-password"
          }
        }
      }
@@ -165,6 +167,41 @@ npm install -g mcp-perforce-server
    ```bash
    mcp-perforce-server --help
    ```
+
+## Authentication Configuration
+
+The server supports multiple methods for providing Perforce credentials, prioritized in this order:
+
+### 1. **Environment Variables** (Highest Priority)
+Set `P4PASSWD` along with other Perforce environment variables:
+
+```bash
+export P4PORT=perforce-server:1666
+export P4USER=your-username
+export P4CLIENT=your-workspace-name
+export P4PASSWD=your-password
+```
+
+### 2. **`.p4config` File** (Recommended)
+Create a `.p4config` file in your project root:
+
+```ini
+P4PORT=perforce-server:1666
+P4USER=your-username
+P4CLIENT=your-workspace-name
+P4PASSWD=your-password
+```
+
+The server automatically searches upward from the current directory to find this file.
+
+### 3. **MCP Configuration**
+Include credentials in your MCP server configuration (see examples above).
+
+**Security Notes:**
+- Passwords are **masked** (`***masked***`) in all logs
+- The system operates **non-interactively** - no password prompts
+- Authentication failures return `P4_AUTH_FAILED` error code
+- For production, prefer `.p4config` files or secure environment variables
 
 ## Security Configuration
 
