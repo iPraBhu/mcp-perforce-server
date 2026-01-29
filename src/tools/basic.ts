@@ -82,7 +82,7 @@ export async function p4Info(
   const result = await context.runner.run('info', [], cwd, {
     env,
     useZtag: false,
-    parseOutput: true,
+    parseOutput: false,
   });
   
   if (result.ok && result.result) {
@@ -116,7 +116,7 @@ export async function p4Opened(
   const result = await context.runner.run('opened', cmdArgs, cwd, {
     env,
     useZtag: false,
-    parseOutput: true,
+    parseOutput: false,
   });
   
   if (result.ok && result.result) {
@@ -144,7 +144,7 @@ export async function p4Status(
   const openedResult = await context.runner.run('opened', [], cwd, {
     env,
     useZtag: false,
-    parseOutput: true,
+    parseOutput: false,
   });
   
   let openedFiles: any[] = [];
@@ -156,7 +156,7 @@ export async function p4Status(
   const changesResult = await context.runner.run('changes', ['-s', 'pending', '-c', env.P4CLIENT || ''], cwd, {
     env,
     useZtag: false,
-    parseOutput: true,
+    parseOutput: false,
   });
   
   let pendingChanges: any[] = [];
@@ -490,12 +490,13 @@ export async function p4Sync(
   const result = await context.runner.run('sync', cmdArgs, cwd, {
     env,
     useZtag: false,
-    parseOutput: true,
+    parseOutput: false,
   });
   
-  if (result.ok && result.result) {
-    result.result = parse.parseSyncOutput(result.result as string);
-  }
+  // TODO: Add parseSyncOutput function if structured output is needed
+  // if (result.ok && result.result) {
+  //   result.result = parse.parseSyncOutput(result.result as string);
+  // }
   
   result.configUsed = {
     ...result.configUsed,
@@ -526,12 +527,13 @@ export async function p4Diff(
   const result = await context.runner.run('diff', cmdArgs, cwd, {
     env,
     useZtag: false,
-    parseOutput: true,
+    parseOutput: false,
   });
   
-  if (result.ok && result.result) {
-    result.result = parse.parseDiffOutput(result.result as string);
-  }
+  // TODO: Add parseDiffOutput function if structured output is needed
+  // if (result.ok && result.result) {
+  //   result.result = parse.parseDiffOutput(result.result as string);
+  // }
   
   result.configUsed = {
     ...result.configUsed,
@@ -602,12 +604,13 @@ export async function p4Resolve(
   const result = await context.runner.run('resolve', cmdArgs, cwd, {
     env,
     useZtag: false,
-    parseOutput: true,
+    parseOutput: false,
   });
 
-  if (result.ok && result.result) {
-    result.result = parse.parseResolveOutput(result.result as string);
-  }
+  // TODO: Add parseResolveOutput function if structured output is needed
+  // if (result.ok && result.result) {
+  //   result.result = parse.parseResolveOutput(result.result as string);
+  // }
 
   result.configUsed = {
     ...result.configUsed,
@@ -666,12 +669,13 @@ export async function p4Shelve(
   const result = await context.runner.run('shelve', cmdArgs, cwd, {
     env,
     useZtag: false,
-    parseOutput: true,
+    parseOutput: false,
   });
 
-  if (result.ok && result.result) {
-    result.result = parse.parseShelveOutput(result.result as string);
-  }
+  // TODO: Add parseShelveOutput function if structured output is needed
+  // if (result.ok && result.result) {
+  //   result.result = parse.parseShelveOutput(result.result as string);
+  // }
 
   result.configUsed = {
     ...result.configUsed,
@@ -730,12 +734,13 @@ export async function p4Unshelve(
   const result = await context.runner.run('unshelve', cmdArgs, cwd, {
     env,
     useZtag: false,
-    parseOutput: true,
+    parseOutput: false,
   });
 
-  if (result.ok && result.result) {
-    result.result = parse.parseUnshelveOutput(result.result as string);
-  }
+  // TODO: Add parseUnshelveOutput function if structured output is needed
+  // if (result.ok && result.result) {
+  //   result.result = parse.parseUnshelveOutput(result.result as string);
+  // }
 
   result.configUsed = {
     ...result.configUsed,
@@ -832,12 +837,13 @@ export async function p4Blame(
   const result = await context.runner.run('blame', ['-a', args.file], cwd, {
     env,
     useZtag: false,
-    parseOutput: true,
+    parseOutput: false,
   });
 
-  if (result.ok && result.result) {
-    result.result = parse.parseBlameOutput(result.result as string);
-  }
+  // TODO: Add parseBlameOutput function if structured output is needed
+  // if (result.ok && result.result) {
+  //   result.result = parse.parseBlameOutput(result.result as string);
+  // }
 
   result.configUsed = {
     ...result.configUsed,
@@ -925,12 +931,13 @@ export async function p4Copy(
   const result = await context.runner.run('copy', cmdArgs, cwd, {
     env,
     useZtag: false,
-    parseOutput: true,
+    parseOutput: false,
   });
 
-  if (result.ok && result.result) {
-    result.result = parse.parseCopyOutput(result.result as string);
-  }
+  // TODO: Add parseCopyOutput function if structured output is needed
+  // if (result.ok && result.result) {
+  //   result.result = parse.parseCopyOutput(result.result as string);
+  // }
 
   result.configUsed = {
     ...result.configUsed,
@@ -1018,12 +1025,13 @@ export async function p4Move(
   const result = await context.runner.run('move', cmdArgs, cwd, {
     env,
     useZtag: false,
-    parseOutput: true,
+    parseOutput: false,
   });
 
-  if (result.ok && result.result) {
-    result.result = parse.parseMoveOutput(result.result as string);
-  }
+  // TODO: Add parseMoveOutput function if structured output is needed
+  // if (result.ok && result.result) {
+  //   result.result = parse.parseMoveOutput(result.result as string);
+  // }
 
   result.configUsed = {
     ...result.configUsed,
@@ -1104,12 +1112,13 @@ export async function p4Grep(
   const result = await context.runner.run('grep', cmdArgs, cwd, {
     env,
     useZtag: false,
-    parseOutput: true,
+    parseOutput: false,
   });
 
-  if (result.ok && result.result) {
-    result.result = parse.parseGrepOutput(result.result as string);
-  }
+  // TODO: Add parseGrepOutput function if structured output is needed
+  // if (result.ok && result.result) {
+  //   result.result = parse.parseGrepOutput(result.result as string);
+  // }
 
   result.configUsed = {
     ...result.configUsed,
@@ -1158,12 +1167,13 @@ export async function p4Files(
   const result = await context.runner.run('files', cmdArgs, cwd, {
     env,
     useZtag: false,
-    parseOutput: true,
+    parseOutput: false,
   });
 
-  if (result.ok && result.result) {
-    result.result = parse.parseFilesOutput(result.result as string);
-  }
+  // TODO: Add parseFilesOutput function if structured output is needed
+  // if (result.ok && result.result) {
+  //   result.result = parse.parseFilesOutput(result.result as string);
+  // }
 
   result.configUsed = {
     ...result.configUsed,
@@ -1208,12 +1218,13 @@ export async function p4Dirs(
   const result = await context.runner.run('dirs', cmdArgs, cwd, {
     env,
     useZtag: false,
-    parseOutput: true,
+    parseOutput: false,
   });
 
-  if (result.ok && result.result) {
-    result.result = parse.parseDirsOutput(result.result as string);
-  }
+  // TODO: Add parseDirsOutput function if structured output is needed
+  // if (result.ok && result.result) {
+  //   result.result = parse.parseDirsOutput(result.result as string);
+  // }
 
   result.configUsed = {
     ...result.configUsed,

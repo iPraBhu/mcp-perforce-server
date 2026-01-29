@@ -35,7 +35,7 @@ export async function p4Users(
   const result = await context.runner.run('users', cmdArgs, cwd, {
     env,
     useZtag: false,
-    parseOutput: true,
+    parseOutput: false,
   });
 
   if (result.ok && result.result) {
@@ -67,7 +67,7 @@ export async function p4User(
   const result = await context.runner.run('user', cmdArgs, cwd, {
     env,
     useZtag: false,
-    parseOutput: true,
+    parseOutput: false,
   });
 
   if (result.ok && result.result) {
@@ -102,7 +102,7 @@ export async function p4Clients(
   const result = await context.runner.run('clients', cmdArgs, cwd, {
     env,
     useZtag: false,
-    parseOutput: true,
+    parseOutput: false,
   });
 
   if (result.ok && result.result) {
@@ -134,7 +134,7 @@ export async function p4Client(
   const result = await context.runner.run('client', cmdArgs, cwd, {
     env,
     useZtag: false,
-    parseOutput: true,
+    parseOutput: false,
   });
 
   if (result.ok && result.result) {
@@ -170,7 +170,7 @@ export async function p4Jobs(
   const result = await context.runner.run('jobs', cmdArgs, cwd, {
     env,
     useZtag: false,
-    parseOutput: true,
+    parseOutput: false,
   });
 
   if (result.ok && result.result) {
@@ -211,7 +211,7 @@ export async function p4Job(
   const result = await context.runner.run('job', [args.job], cwd, {
     env,
     useZtag: false,
-    parseOutput: true,
+    parseOutput: false,
   });
 
   if (result.ok && result.result) {
@@ -246,7 +246,7 @@ export async function p4Fixes(
   const result = await context.runner.run('fixes', cmdArgs, cwd, {
     env,
     useZtag: false,
-    parseOutput: true,
+    parseOutput: false,
   });
 
   if (result.ok && result.result) {
@@ -285,7 +285,7 @@ export async function p4Labels(
   const result = await context.runner.run('labels', cmdArgs, cwd, {
     env,
     useZtag: false,
-    parseOutput: true,
+    parseOutput: false,
   });
 
   if (result.ok && result.result) {
@@ -326,7 +326,7 @@ export async function p4Label(
   const result = await context.runner.run('label', [args.label], cwd, {
     env,
     useZtag: false,
-    parseOutput: true,
+    parseOutput: false,
   });
 
   if (result.ok && result.result) {
@@ -360,7 +360,7 @@ export async function p4Sizes(
   const result = await context.runner.run('sizes', cmdArgs, cwd, {
     env,
     useZtag: false,
-    parseOutput: true,
+    parseOutput: false,
   });
 
   if (result.ok && result.result) {
@@ -392,7 +392,7 @@ export async function p4Have(
   const result = await context.runner.run('have', cmdArgs, cwd, {
     env,
     useZtag: false,
-    parseOutput: true,
+    parseOutput: false,
   });
 
   if (result.ok && result.result) {
@@ -433,7 +433,7 @@ export async function p4Where(
   const result = await context.runner.run('where', args.files, cwd, {
     env,
     useZtag: false,
-    parseOutput: true,
+    parseOutput: false,
   });
 
   if (result.ok && result.result) {
