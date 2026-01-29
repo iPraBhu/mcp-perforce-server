@@ -2,9 +2,6 @@
  * Changelist management tools for MCP Perforce server
  */
 
-import * as fs from 'fs';
-import * as path from 'path';
-import * as os from 'os';
 import { P4Runner, P4RunResult } from '../p4/runner.js';
 import { P4Config, P4ServerConfig } from '../p4/config.js';
 import { SecurityManager } from '../p4/security.js';
@@ -24,7 +21,8 @@ export async function p4ChangelistCreate(
   context: ToolContext,
   args: { description: string; files?: string[]; workspacePath?: string }
 ): Promise<P4RunResult> {
-  if (!args.description || args.description.trim() === '') {
+  // Validate description
+  if (!args.description || typeof args.description !== 'string') {
     return {
       ok: false,
       command: 'change',
@@ -33,11 +31,101 @@ export async function p4ChangelistCreate(
       configUsed: {},
       error: {
         code: 'P4_INVALID_ARGS',
-        message: 'description parameter is required and must not be empty',
+        message: 'description parameter is required and must be a string',
       },
     };
   }
-  
+
+  if (args.description.trim() === '') {
+    return {
+      ok: false,
+      command: 'change',
+      args: [],
+      cwd: process.cwd(),
+      configUsed: {},
+      error: {
+        code: 'P4_INVALID_ARGS',
+        message: 'description parameter must not be empty',
+      },
+    };
+  }
+
+  if (args.description.length > 32767) {
+    return {
+      ok: false,
+      command: 'change',
+      args: [],
+      cwd: process.cwd(),
+      configUsed: {},
+      error: {
+        code: 'P4_INVALID_ARGS',
+        message: 'description too long (maximum 32767 characters)',
+      },
+    };
+  }
+
+  // Validate files if provided
+  if (args.files) {
+    if (!Array.isArray(args.files)) {
+      return {
+        ok: false,
+        command: 'change',
+        args: [],
+        cwd: process.cwd(),
+        configUsed: {},
+        error: {
+          code: 'P4_INVALID_ARGS',
+          message: 'files parameter must be an array',
+        },
+      };
+    }
+
+    if (args.files.length > 1000) {
+      return {
+        ok: false,
+        command: 'change',
+        args: [],
+        cwd: process.cwd(),
+        configUsed: {},
+        error: {
+          code: 'P4_INVALID_ARGS',
+          message: 'too many files (maximum 1000)',
+        },
+      };
+    }
+
+    for (const file of args.files) {
+      if (typeof file !== 'string' || file.length === 0 || file.length > 4096) {
+        return {
+          ok: false,
+          command: 'change',
+          args: [],
+          cwd: process.cwd(),
+          configUsed: {},
+          error: {
+            code: 'P4_INVALID_ARGS',
+            message: 'invalid file path in files array',
+          },
+        };
+      }
+    }
+  }
+
+  // Validate workspace path
+  if (args.workspacePath && (typeof args.workspacePath !== 'string' || args.workspacePath.length > 4096)) {
+    return {
+      ok: false,
+      command: 'change',
+      args: [],
+      cwd: process.cwd(),
+      configUsed: {},
+      error: {
+        code: 'P4_INVALID_ARGS',
+        message: 'invalid workspacePath',
+      },
+    };
+  }
+
   if (context.serverConfig.readOnlyMode) {
     return {
       ok: false,
@@ -63,46 +151,31 @@ export async function p4ChangelistCreate(
       client: env.P4CLIENT,
     });
     
-    // Write spec to temporary file
-    const tempFile = path.join(os.tmpdir(), `p4change_${Date.now()}.tmp`);
-    await fs.promises.writeFile(tempFile, spec);
-    
-    try {
-      const result = await context.runner.run('change', ['-i'], cwd, {
-        env,
-        useZtag: false,
-        parseOutput: false,
-      });
+    const result = await context.runner.run('change', ['-i'], cwd, {
+      env,
+      useZtag: false,
+      parseOutput: false,
+      stdin: spec,
+    });
       
-      // Feed the spec via stdin (simulated by file for now)
-      // In a real implementation, you'd pipe the spec to stdin
+    result.configUsed = {
+      ...result.configUsed,
+      p4configPath: configResult.configPath,
+    };
       
-      result.configUsed = {
-        ...result.configUsed,
-        p4configPath: configResult.configPath,
-      };
-      
-      if (result.ok && result.result) {
-        // Parse changelist number from output
-        const match = (result.result as string).match(/Change (\d+) created/);
-        if (match) {
-          result.result = {
-            changelist: parseInt(match[1], 10),
-            description: args.description,
-            message: result.result,
-          };
-        }
-      }
-      
-      return result;
-    } finally {
-      // Clean up temp file
-      try {
-        await fs.promises.unlink(tempFile);
-      } catch {
-        // Ignore cleanup errors
+    if (result.ok && result.result) {
+      // Parse changelist number from output
+      const match = (result.result as string).match(/Change (\d+) created/);
+      if (match) {
+        result.result = {
+          changelist: parseInt(match[1], 10),
+          description: args.description,
+          message: result.result,
+        };
       }
     }
+      
+    return result;
   } catch (error) {
     return {
       ok: false,
@@ -179,39 +252,27 @@ export async function p4ChangelistUpdate(
       client: env.P4CLIENT,
     });
     
-    // Write spec to temporary file
-    const tempFile = path.join(os.tmpdir(), `p4change_${Date.now()}.tmp`);
-    await fs.promises.writeFile(tempFile, spec);
-    
-    try {
-      const result = await context.runner.run('change', ['-i'], cwd, {
-        env,
-        useZtag: false,
-        parseOutput: false,
-      });
+    const result = await context.runner.run('change', ['-i'], cwd, {
+      env,
+      useZtag: false,
+      parseOutput: false,
+      stdin: spec,
+    });
       
-      result.configUsed = {
-        ...result.configUsed,
-        p4configPath: configResult.configPath,
+    result.configUsed = {
+      ...result.configUsed,
+      p4configPath: configResult.configPath,
+    };
+      
+    if (result.ok && result.result) {
+      result.result = {
+        changelist: parseInt(args.changelist, 10),
+        description: currentDescription,
+        message: result.result,
       };
-      
-      if (result.ok && result.result) {
-        result.result = {
-          changelist: parseInt(args.changelist, 10),
-          description: currentDescription,
-          message: result.result,
-        };
-      }
-      
-      return result;
-    } finally {
-      // Clean up temp file
-      try {
-        await fs.promises.unlink(tempFile);
-      } catch {
-        // Ignore cleanup errors
-      }
     }
+      
+    return result;
   } catch (error) {
     return {
       ok: false,
@@ -333,43 +394,31 @@ export async function p4Submit(
       files: args.files,
     });
     
-    // Write spec to temporary file
-    const tempFile = path.join(os.tmpdir(), `p4submit_${Date.now()}.tmp`);
-    await fs.promises.writeFile(tempFile, spec);
-    
-    try {
-      const result = await context.runner.run('submit', ['-i'], cwd, {
-        env,
-        useZtag: false,
-        parseOutput: false,
-      });
+    const result = await context.runner.run('submit', ['-i'], cwd, {
+      env,
+      useZtag: false,
+      parseOutput: false,
+      stdin: spec,
+    });
       
-      result.configUsed = {
-        ...result.configUsed,
-        p4configPath: configResult.configPath,
-      };
+    result.configUsed = {
+      ...result.configUsed,
+      p4configPath: configResult.configPath,
+    };
       
-      if (result.ok && result.result) {
-        // Parse submit result
-        const match = (result.result as string).match(/Change (\d+) submitted/);
-        if (match) {
-          result.result = {
-            changelist: parseInt(match[1], 10),
-            description: args.description,
-            message: result.result,
-          };
-        }
-      }
-      
-      return result;
-    } finally {
-      // Clean up temp file
-      try {
-        await fs.promises.unlink(tempFile);
-      } catch {
-        // Ignore cleanup errors
+    if (result.ok && result.result) {
+      // Parse submit result
+      const match = (result.result as string).match(/Change (\d+) submitted/);
+      if (match) {
+        result.result = {
+          changelist: parseInt(match[1], 10),
+          description: args.description,
+          message: result.result,
+        };
       }
     }
+      
+    return result;
   } catch (error) {
     return {
       ok: false,

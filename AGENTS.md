@@ -239,6 +239,7 @@ This document describes all available agents (tools) provided by the MCP Perforc
 **Description**: List workspaces/clients  
 **Parameters**:
 - `user` (optional): Filter by user
+- `max` (optional): Maximum number of results
 - `workspacePath` (optional): Path to workspace directory  
 **Returns**: List of client workspaces
 

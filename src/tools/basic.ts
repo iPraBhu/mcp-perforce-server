@@ -15,6 +15,62 @@ export interface ToolContext {
 }
 
 /**
+ * Input validation utilities
+ */
+function validateFiles(files: string[]): { valid: boolean; error?: string } {
+  if (!Array.isArray(files)) {
+    return { valid: false, error: 'files must be an array' };
+  }
+  if (files.length === 0) {
+    return { valid: false, error: 'files array cannot be empty' };
+  }
+  if (files.length > 1000) {
+    return { valid: false, error: 'too many files (maximum 1000)' };
+  }
+  for (const file of files) {
+    if (typeof file !== 'string') {
+      return { valid: false, error: 'all files must be strings' };
+    }
+    if (file.length === 0) {
+      return { valid: false, error: 'file paths cannot be empty' };
+    }
+    if (file.length > 4096) {
+      return { valid: false, error: 'file path too long (maximum 4096 characters)' };
+    }
+    // Basic path traversal protection
+    if (file.includes('..') || file.startsWith('/') || file.match(/^[A-Za-z]:/)) {
+      return { valid: false, error: 'invalid file path' };
+    }
+  }
+  return { valid: true };
+}
+
+function validateChangelist(changelist: string): { valid: boolean; error?: string } {
+  if (typeof changelist !== 'string') {
+    return { valid: false, error: 'changelist must be a string' };
+  }
+  if (!/^\d+$/.test(changelist)) {
+    return { valid: false, error: 'changelist must be a valid number' };
+  }
+  const num = parseInt(changelist, 10);
+  if (num <= 0 || num > 999999) {
+    return { valid: false, error: 'changelist number out of valid range' };
+  }
+  return { valid: true };
+}
+
+function validateWorkspacePath(path?: string): { valid: boolean; error?: string } {
+  if (path === undefined) return { valid: true };
+  if (typeof path !== 'string') {
+    return { valid: false, error: 'workspacePath must be a string' };
+  }
+  if (path.length > 4096) {
+    return { valid: false, error: 'workspacePath too long' };
+  }
+  return { valid: true };
+}
+
+/**
  * p4 info - Get Perforce server and client information
  */
 export async function p4Info(
@@ -151,7 +207,9 @@ export async function p4Add(
   context: ToolContext,
   args: { files: string[]; changelist?: string; workspacePath?: string }
 ): Promise<P4RunResult> {
-  if (!args.files || args.files.length === 0) {
+  // Validate inputs
+  const filesValidation = validateFiles(args.files);
+  if (!filesValidation.valid) {
     return {
       ok: false,
       command: 'add',
@@ -160,7 +218,39 @@ export async function p4Add(
       configUsed: {},
       error: {
         code: 'P4_INVALID_ARGS',
-        message: 'files parameter is required and must not be empty',
+        message: `Invalid files: ${filesValidation.error}`,
+      },
+    };
+  }
+  
+  if (args.changelist) {
+    const changelistValidation = validateChangelist(args.changelist);
+    if (!changelistValidation.valid) {
+      return {
+        ok: false,
+        command: 'add',
+        args: [],
+        cwd: process.cwd(),
+        configUsed: {},
+        error: {
+          code: 'P4_INVALID_ARGS',
+          message: `Invalid changelist: ${changelistValidation.error}`,
+        },
+      };
+    }
+  }
+  
+  const workspaceValidation = validateWorkspacePath(args.workspacePath);
+  if (!workspaceValidation.valid) {
+    return {
+      ok: false,
+      command: 'add',
+      args: [],
+      cwd: process.cwd(),
+      configUsed: {},
+      error: {
+        code: 'P4_INVALID_ARGS',
+        message: `Invalid workspacePath: ${workspaceValidation.error}`,
       },
     };
   }

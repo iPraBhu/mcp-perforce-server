@@ -35,7 +35,6 @@ export {
 
 export {
   p4Filelog,
-  p4Clients,
   p4ConfigDetect
 } from './utils.js';
 
@@ -43,6 +42,7 @@ export {
 export {
   p4Users,
   p4User,
+  p4Clients,
   p4Client,
   p4Jobs,
   p4Job,

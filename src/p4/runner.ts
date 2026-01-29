@@ -33,6 +33,7 @@ export interface P4RunOptions {
   useZtag?: boolean;
   useMarshalled?: boolean;
   maxMemoryMB?: number;
+  stdin?: string;
 }
 
 export class P4Runner {
@@ -57,6 +58,7 @@ export class P4Runner {
       useZtag = false,
       useMarshalled = false,
       maxMemoryMB = parseInt(process.env.P4_MAX_MEMORY_MB || '512'),
+      stdin,
     } = options;
 
     // Check memory limits before starting
@@ -116,6 +118,7 @@ export class P4Runner {
         cwd,
         env: processEnv,
         timeout,
+        stdin,
       });
 
       if (exitCode === 0) {
@@ -143,7 +146,7 @@ export class P4Runner {
 
   private async spawnP4Process(
     args: string[],
-    options: { cwd: string; env: Record<string, string | undefined>; timeout: number }
+    options: { cwd: string; env: Record<string, string | undefined>; timeout: number; stdin?: string }
   ): Promise<{ stdout: string; stderr: string; exitCode: number }> {
     return new Promise((resolve, reject) => {
       const spawnOptions: SpawnOptions = {
@@ -151,7 +154,7 @@ export class P4Runner {
         env: options.env,
         shell: false, // Critical: avoid shell on Windows
         windowsHide: true,
-        stdio: ['ignore', 'pipe', 'pipe'], // Hide stdin, capture stdout/stderr
+        stdio: [options.stdin ? 'pipe' : 'ignore', 'pipe', 'pipe'], // Use pipe for stdin if input provided
         detached: false, // Keep attached to parent process
       };
 
@@ -160,6 +163,12 @@ export class P4Runner {
       let stdout = '';
       let stderr = '';
       let timeoutHandle: NodeJS.Timeout | null = null;
+
+      // Write to stdin if provided
+      if (options.stdin && child.stdin) {
+        child.stdin.write(options.stdin);
+        child.stdin.end();
+      }
 
       // Set up timeout
       if (options.timeout > 0) {

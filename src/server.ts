@@ -426,6 +426,10 @@ class MCPPerforceServer {
                   type: 'string',
                   description: 'Filter by user (optional)',
                 },
+                max: {
+                  type: 'number',
+                  description: 'Maximum number of results (optional)',
+                },
                 workspacePath: {
                   type: 'string',
                   description: 'Path to workspace directory (optional, defaults to current directory)',

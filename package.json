@@ -13,6 +13,7 @@
     "watch": "tsc --watch",
     "clean": "rimraf dist",
     "test": "node test-server.js",
+    "test:integration": "npm run build && node integration-test.js",
     "prepare": "npm run build",
     "prepublishOnly": "npm run clean && npm run build",
     "audit-fix": "npm audit fix"

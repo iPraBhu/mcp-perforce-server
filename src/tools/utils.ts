@@ -62,38 +62,6 @@ export async function p4Filelog(
 }
 
 /**
- * p4 clients - List Perforce clients/workspaces
- */
-export async function p4Clients(
-  context: ToolContext,
-  args: { user?: string; workspacePath?: string } = {}
-): Promise<P4RunResult> {
-  const { cwd, env, configResult } = await context.config.setupForCommand(args.workspacePath);
-  
-  const cmdArgs: string[] = [];
-  if (args.user) {
-    cmdArgs.push('-u', args.user);
-  }
-  
-  const result = await context.runner.run('clients', cmdArgs, cwd, {
-    env,
-    useZtag: false,
-    parseOutput: true,
-  });
-  
-  if (result.ok && result.result) {
-    result.result = parse.parseClientsOutput(result.result as string);
-  }
-  
-  result.configUsed = {
-    ...result.configUsed,
-    p4configPath: configResult.configPath,
-  };
-  
-  return result;
-}
-
-/**
  * p4.config.detect - Detect and show Perforce configuration
  */
 export async function p4ConfigDetect(
