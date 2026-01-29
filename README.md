@@ -7,7 +7,7 @@
 
 Enterprise-grade MCP (Model Context Protocol) server providing secure, non-interactive Perforce operations for AI-assisted development workflows with Claude, ChatGPT, VS Code, and Cursor IDE.
 
-> **Created by [Pratik Bhuite](https://github.com/iPraBhu)** using vibe coding to solve real-world Perforce automation challenges. Open source, community-driven, and ready for customization!
+> **Created using vibe coding to solve real-world Perforce automation challenges. Open source, community-driven, and ready for customization!
 
 ## Overview
 
@@ -116,15 +116,6 @@ Production-ready server that exposes **37+ Perforce VCS operations** through the
 - **Open source** with community contributions and transparent development
 - **Active maintenance** with regular updates and security patches
 
-## Origin Story
-
-This project was born from a real need! I was facing challenges integrating Perforce with AI development tools and decided to solve it using **vibe coding** - building something that just works, feels right, and solves real problems.
-
-**🤝 Community Welcome**
-- ✅ **Use freely** - This is open source, use it however you need
-- 🐛 **Report issues** - Found a bug? Please let me know!
-- 🔧 **Customize** - Fork it, modify it, make it yours
-- 💡 **Contribute** - Ideas, PRs, and feedback are always welcome
 
 ## Installation
 
