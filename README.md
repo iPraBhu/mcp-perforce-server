@@ -20,13 +20,14 @@ Production-ready server that exposes **37+ Perforce VCS operations** through the
 - 🧹 **Input Sanitization** - Regex validation and path traversal protection
 - 💾 **Memory Management** - Process monitoring with automatic GC and limits
 - 📊 **Audit Logging** - Complete operation tracking with retention policies
+- ⚡ **Performance Optimized** - Fast/Balanced/Secure modes with configurable timeouts and caching
 - 🌐 **Cross-platform Support** - Windows, macOS, Linux compatibility
 - 🤖 **AI Integration** - Works with Claude, ChatGPT, VS Code, Cursor, and other AI assistants
-- ⚡ **Non-interactive Operations** - Automated Perforce commands with comprehensive error handling
+- 🚀 **Non-interactive Operations** - Automated Perforce commands with comprehensive error handling
 - 📁 **Multi-project Support** - Automatic `.p4config` detection with upward directory search
 - 🛡️ **Production Ready** - Structured JSON responses with standardized error codes
 - 🔧 **Developer Friendly** - TypeScript support with comprehensive documentation
-- 🚀 **Zero Configuration** - Works out-of-the-box with sensible defaults
+- 🎯 **Zero Configuration** - Works out-of-the-box with sensible defaults
 
 ## Core Capabilities
 
@@ -163,7 +164,13 @@ npm install -g mcp-perforce-server
    }
    ```
 
-3. **Verification:**
+3. **Performance (Optional):** For faster responses in development:
+   ```bash
+   export P4_PERFORMANCE_MODE=fast
+   export P4_TIMEOUT_MS=5000
+   ```
+
+4. **Verification:**
    ```bash
    mcp-perforce-server --help
    ```
@@ -219,6 +226,61 @@ P4_READONLY_MODE=false P4_DISABLE_DELETE=true
 
 # Full access (use with caution)
 P4_READONLY_MODE=false P4_DISABLE_DELETE=false
+```
+
+## Performance Configuration
+
+**Performance Optimization:**
+The MCP server includes multiple performance modes to balance speed with security features:
+
+**Development (Fastest Response):**
+```bash
+# Fast Mode - Optimized for development speed
+export P4_PERFORMANCE_MODE=fast
+export P4_TIMEOUT_MS=5000                    # 5 second timeout
+export P4_ENABLE_RATE_LIMITING=false         # Disable rate limiting overhead
+export P4_ENABLE_MEMORY_LIMITS=false         # Disable memory monitoring overhead  
+export P4_ENABLE_AUDIT_LOGGING=false         # Disable audit logging overhead
+export P4_CONFIG_CACHE_TTL=600000             # Cache config for 10 minutes
+```
+
+**Balanced (Recommended):**
+```bash
+# Balanced Mode - Good performance with essential monitoring
+export P4_PERFORMANCE_MODE=balanced
+export P4_TIMEOUT_MS=10000                   # 10 second timeout
+export P4_ENABLE_RATE_LIMITING=false         # Rate limiting disabled
+export P4_ENABLE_MEMORY_LIMITS=true          # Memory monitoring enabled
+export P4_ENABLE_AUDIT_LOGGING=false         # Audit logging disabled
+export P4_CONFIG_CACHE_TTL=300000             # Cache config for 5 minutes
+```
+
+**Production (Secure):**
+```bash
+# Secure Mode - Full security features enabled
+export P4_PERFORMANCE_MODE=secure
+export P4_TIMEOUT_MS=15000                   # 15 second timeout
+export P4_ENABLE_RATE_LIMITING=true          # Rate limiting enabled
+export P4_ENABLE_MEMORY_LIMITS=true          # Memory monitoring enabled
+export P4_ENABLE_AUDIT_LOGGING=true          # Audit logging enabled
+export P4_CONFIG_CACHE_TTL=300000             # Cache config for 5 minutes
+```
+
+**Performance Features:**
+- ⚡ **Fast Command Timeouts** - Configurable 5-60+ second timeouts vs default 60s
+- 🗄️ **Configuration Caching** - Cache .p4config lookups for 5-10 minutes  
+- 🧠 **Optimized Memory Checks** - Periodic vs per-operation memory monitoring
+- 🚦 **Smart Rate Limiting** - Disabled in development, optimized algorithms in production
+- 📊 **Selective Audit Logging** - Minimal overhead with configurable detail levels
+- 🎯 **Automatic Mode Detection** - Development vs production environment detection
+
+**Custom Tuning:**
+```bash
+# Fine-tune individual components
+P4_TIMEOUT_MS=8000                          # Custom timeout in milliseconds
+P4_CONFIG_CACHE_TTL=420000                   # Custom cache TTL (7 minutes)  
+P4_MAX_MEMORY_MB=1024                        # Memory limit in MB
+NODE_ENV=development                         # Triggers automatic performance optimizations
 ```
 
 ## Compliance & Security Features

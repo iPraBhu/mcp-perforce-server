@@ -37,8 +37,10 @@ export interface P4RunOptions {
 }
 
 export class P4Runner {
-  private static readonly DEFAULT_TIMEOUT = 60000; // 60 seconds
+  private static readonly DEFAULT_TIMEOUT = parseInt(process.env.P4_TIMEOUT_MS || '10000'); // 10 seconds default, configurable
   private readonly p4Path: string;
+  private lastMemoryCheck = 0;
+  private readonly MEMORY_CHECK_INTERVAL = 30000; // Check memory every 30 seconds max
 
   constructor() {
     // Support P4_PATH environment variable override
@@ -61,22 +63,26 @@ export class P4Runner {
       stdin,
     } = options;
 
-    // Check memory limits before starting
-    const memUsage = process.memoryUsage();
-    const currentMemoryMB = memUsage.rss / 1024 / 1024;
+    // Optimized memory checking - only check periodically to improve performance
+    const now = Date.now();
+    if (now - this.lastMemoryCheck > this.MEMORY_CHECK_INTERVAL) {
+      const memUsage = process.memoryUsage();
+      const currentMemoryMB = memUsage.rss / 1024 / 1024;
+      this.lastMemoryCheck = now;
 
-    if (currentMemoryMB > maxMemoryMB) {
-      return {
-        ok: false,
-        command: this.p4Path,
-        args: [command, ...args],
-        cwd,
-        configUsed: {},
-        error: {
-          code: 'P4_MEMORY_LIMIT',
-          message: `Memory limit exceeded: ${currentMemoryMB.toFixed(1)}MB > ${maxMemoryMB}MB`,
-        },
-      };
+      if (currentMemoryMB > maxMemoryMB) {
+        return {
+          ok: false,
+          command: this.p4Path,
+          args: [command, ...args],
+          cwd,
+          configUsed: {},
+          error: {
+            code: 'P4_MEMORY_LIMIT',
+            message: `Memory limit exceeded: ${currentMemoryMB.toFixed(1)}MB > ${maxMemoryMB}MB`,
+          },
+        };
+      }
     }
 
     // Build full command args
@@ -123,14 +129,22 @@ export class P4Runner {
 
       if (exitCode === 0) {
         result.ok = true;
-        if (parseOutput && stdout.trim()) {
-          result.result = this.parseOutput(stdout, useZtag, useMarshalled);
+        if (parseOutput && stdout && typeof stdout === 'string' && stdout.trim()) {
+          try {
+            result.result = this.parseOutput(stdout, useZtag, useMarshalled);
+          } catch (parseError) {
+            // If parsing fails, return raw output with warning
+            result.result = stdout.trim() || null;
+            result.warnings = result.warnings || [];
+            const errorMessage = parseError instanceof Error ? parseError.message : String(parseError);
+            result.warnings.push(`Parse warning: ${errorMessage}`);
+          }
         } else {
-          result.result = stdout.trim() || null;
+          result.result = (stdout && typeof stdout === 'string' ? stdout.trim() : null) || null;
         }
         
-        // Check for warnings in stderr
-        if (stderr.trim()) {
+        // Defensive: Check for warnings in stderr with type safety
+        if (stderr && typeof stderr === 'string' && stderr.trim()) {
           result.warnings = stderr.split('\n').filter(line => line.trim());
         }
       } else {
@@ -192,8 +206,8 @@ export class P4Runner {
           clearTimeout(timeoutHandle);
         }
         resolve({
-          stdout,
-          stderr,
+          stdout: String(stdout || ''),
+          stderr: String(stderr || ''),
           exitCode: code ?? -1,
         });
       });
@@ -231,6 +245,11 @@ export class P4Runner {
 
   private parseZtagOutput(output: string): any[] {
     const results: any[] = [];
+    
+    if (!output || typeof output !== 'string') {
+      return results;
+    }
+    
     const lines = output.split('\n');
     let currentRecord: any = {};
     
@@ -265,6 +284,11 @@ export class P4Runner {
   }
 
   private parseTextOutput(output: string): any {
+    // Handle non-string inputs
+    if (!output || typeof output !== 'string') {
+      return null;
+    }
+    
     const lines = output.split('\n').filter(line => line.trim());
     
     // Try to detect structured output patterns

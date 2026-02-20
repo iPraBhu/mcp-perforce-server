@@ -13,6 +13,10 @@ async function runIntegrationTests() {
   console.error('[INTEGRATION TEST] Starting comprehensive MCP Perforce server tests...');
 
   try {
+    // Clean environment for consistent testing
+    delete process.env.P4_READONLY_MODE;
+    delete process.env.P4_DISABLE_DELETE;
+    
     // Setup test environment
     const runner = new P4Runner();
     const config = new P4Config();
@@ -46,7 +50,19 @@ async function runIntegrationTests() {
     if (!validInputResult.ok && validInputResult.error?.code === 'P4_READONLY_MODE') {
       console.error('[INTEGRATION TEST] ✓ Valid input validation passes (fails on read-only as expected)');
     } else {
-      console.error('[INTEGRATION TEST] ✗ Valid input validation failed unexpectedly');
+      console.error('[INTEGRATION TEST] ✗ Valid input validation failed unexpectedly:', {
+        ok: validInputResult.ok, 
+        errorCode: validInputResult.error?.code,
+        message: validInputResult.error?.message
+      });
+    }
+
+    // Test depot path validation
+    const depotPathResult = await tools.p4Add(context, { files: ['//depot/main/src/file.cpp'] });
+    if (!depotPathResult.ok && depotPathResult.error?.code === 'P4_READONLY_MODE') {
+      console.error('[INTEGRATION TEST] ✓ Depot path validation works');
+    } else {
+      console.error('[INTEGRATION TEST] ✗ Depot path validation failed');
     }
 
     // Test 2: Tool availability

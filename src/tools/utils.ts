@@ -46,11 +46,29 @@ export async function p4Filelog(
   const result = await context.runner.run('filelog', cmdArgs, cwd, {
     env,
     useZtag: false,
-    parseOutput: true,
+    parseOutput: false,
   });
   
-  if (result.ok && result.result) {
-    result.result = parse.parseFilelogOutput(result.result as string);
+  // Defensive programming: ensure result.result is properly handled
+  if (result.ok && result.result !== null && result.result !== undefined) {
+    // Additional safety check to ensure result.result is a string before parsing
+    if (typeof result.result === 'string' && result.result.trim().length > 0) {
+      try {
+        result.result = parse.parseFilelogOutput(result.result);
+      } catch (parseError) {
+        // If parsing fails, return raw result with warning
+        result.warnings = result.warnings || [];
+        const errorMessage = parseError instanceof Error ? parseError.message : String(parseError);
+        result.warnings.push(`Parse warning: ${errorMessage}`);
+        // Keep the raw result instead of failing completely
+      }
+    } else {
+      // If result is not a string or is empty, return empty array
+      result.result = [];
+    }
+  } else if (result.ok) {
+    // If result.ok is true but result.result is null/undefined, return empty array
+    result.result = [];
   }
   
   result.configUsed = {

@@ -1191,17 +1191,17 @@ Usage:
   mcp-perforce-server --version Show version information
 
 Environment Variables:
-  P4_READONLY_MODE=false      Enable write operations (default: true)
-  P4_DISABLE_DELETE=false     Enable delete operations (default: true)
+  P4_READONLY_MODE=false      Enable write operations (default: read-only enabled)
+  P4_DISABLE_DELETE=false     Enable delete operations (default: delete disabled)  
   P4_PATH=/path/to/p4         Custom p4 executable path
   P4CONFIG=.p4config         Config file name (default: .p4config)
   LOG_LEVEL=info             Logging level: error,warn,info,debug
 
 Compliance & Security:
-  P4_ENABLE_AUDIT_LOGGING=true   Enable audit logging (default: false)
-  P4_ENABLE_RATE_LIMITING=false  Disable rate limiting (default: true)
-  P4_ENABLE_MEMORY_LIMITS=false  Disable memory limits (default: true)
-  P4_ENABLE_INPUT_SANITIZATION=false Disable input sanitization (default: true)
+  P4_ENABLE_AUDIT_LOGGING=true   Enable audit logging (default: disabled)
+  P4_ENABLE_RATE_LIMITING=false  Disable rate limiting (default: enabled)
+  P4_ENABLE_MEMORY_LIMITS=false  Disable memory limits (default: enabled)
+  P4_ENABLE_INPUT_SANITIZATION=false Disable input sanitization (default: enabled)
   P4_MAX_MEMORY_MB=1024         Memory limit in MB (default: 512)
   P4_AUDIT_RETENTION_DAYS=365   Audit log retention days (default: 90)
   P4_RATE_LIMIT_REQUESTS=100    Max requests per window (default: 100)

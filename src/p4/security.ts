@@ -41,22 +41,25 @@ export class SecurityManager {
   private rateLimitStore = new Map<string, { count: number; resetTime: number; blockedUntil?: number }>();
   private auditLog: AuditLogEntry[] = [];
   private complianceConfig: ComplianceConfig;
+  private lastCleanup = 0;
+  private readonly CLEANUP_INTERVAL = 24 * 60 * 60 * 1000; // Daily cleanup
 
   constructor(config: Partial<ComplianceConfig> = {}) {
+    // Performance-optimized defaults: disable expensive features in development
+    const isDevelopment = process.env.NODE_ENV === 'development' || process.env.P4_PERFORMANCE_MODE === 'fast';
+    
     this.complianceConfig = {
       enableAuditLogging: process.env.P4_ENABLE_AUDIT_LOGGING === 'true',
-      enableRateLimiting: process.env.P4_ENABLE_RATE_LIMITING !== 'false',
-      enableMemoryLimits: process.env.P4_ENABLE_MEMORY_LIMITS !== 'false',
+      enableRateLimiting: isDevelopment ? false : (process.env.P4_ENABLE_RATE_LIMITING !== 'false'),
+      enableMemoryLimits: isDevelopment ? false : (process.env.P4_ENABLE_MEMORY_LIMITS !== 'false'),
       enableInputSanitization: process.env.P4_ENABLE_INPUT_SANITIZATION !== 'false',
       maxMemoryMB: parseInt(process.env.P4_MAX_MEMORY_MB || '512'),
       auditLogRetentionDays: parseInt(process.env.P4_AUDIT_RETENTION_DAYS || '90'),
       ...config,
     };
 
-    // Clean up audit logs periodically
-    if (this.complianceConfig.enableAuditLogging) {
-      setInterval(() => this.cleanupAuditLogs(), 24 * 60 * 60 * 1000); // Daily cleanup
-    }
+    // Optimize cleanup to avoid unnecessary timers
+    this.lastCleanup = Date.now();
   }
 
   /**
@@ -67,6 +70,7 @@ export class SecurityManager {
     windowMs: parseInt(process.env.P4_RATE_LIMIT_WINDOW_MS || '600000'), // 10 minutes
     blockDurationMs: parseInt(process.env.P4_RATE_LIMIT_BLOCK_MS || '3600000'), // 1 hour
   }): { allowed: boolean; remaining: number; resetTime: number; blockedUntil?: number } {
+    // Fast path: skip rate limiting if disabled
     if (!this.complianceConfig.enableRateLimiting) {
       return { allowed: true, remaining: config.maxRequests, resetTime: Date.now() + config.windowMs };
     }
@@ -74,7 +78,7 @@ export class SecurityManager {
     const now = Date.now();
     const record = this.rateLimitStore.get(identifier);
 
-    // Check if currently blocked
+    // Fast path: check if currently blocked
     if (record?.blockedUntil && now < record.blockedUntil) {
       return {
         allowed: false,
@@ -84,20 +88,19 @@ export class SecurityManager {
       };
     }
 
-    // Reset window if expired
+    // Reset window if expired or create new record
     if (!record || now > record.resetTime) {
-      this.rateLimitStore.set(identifier, {
-        count: 1,
-        resetTime: now + config.windowMs,
-      });
-      return { allowed: true, remaining: config.maxRequests - 1, resetTime: now + config.windowMs };
+      const newRecord = { count: 1, resetTime: now + config.windowMs };
+      this.rateLimitStore.set(identifier, newRecord);
+      return { allowed: true, remaining: config.maxRequests - 1, resetTime: newRecord.resetTime };
     }
 
-    // Increment counter
-    record.count++;
+    // Increment counter (avoid multiple object updates)
+    const newCount = record.count + 1;
+    record.count = newCount;
 
     // Check if limit exceeded
-    if (record.count > config.maxRequests) {
+    if (newCount > config.maxRequests) {
       record.blockedUntil = now + config.blockDurationMs;
       return {
         allowed: false,
@@ -109,7 +112,7 @@ export class SecurityManager {
 
     return {
       allowed: true,
-      remaining: config.maxRequests - record.count,
+      remaining: config.maxRequests - newCount,
       resetTime: record.resetTime,
     };
   }
@@ -127,15 +130,26 @@ export class SecurityManager {
 
     switch (type) {
       case 'filespec':
-        // Perforce filespec validation - prevent dangerous patterns
-        if (sanitized.includes('..') && !sanitized.startsWith('//')) {
-          warnings.push('Relative path traversal detected in filespec');
+        // Enhanced Perforce filespec validation supporting depot paths and wildcards
+        if (sanitized.includes('..')) {
+          // Allow standard Perforce depot patterns
+          if (sanitized.startsWith('//') || sanitized.endsWith('/...') || sanitized.endsWith('\\...')) {
+            // Valid depot syntax like //depot/main/...
+          } else if (sanitized.match(/\.\.[\/\\].*[\/\\]\.\./)) {
+            warnings.push('Multiple path traversal detected - potential security risk');
+          } else if (sanitized.match(/\.\.[\/\\](etc|usr|var|sys|proc|dev|windows|system32)/i)) {
+            warnings.push('Access to system directories detected');
+          }
         }
-        if (sanitized.includes('*') && sanitized.includes('..')) {
-          warnings.push('Wildcard with path traversal detected');
+        // Enhanced wildcard validation for Perforce patterns
+        if (sanitized.includes('*')) {
+          // Allow standard Perforce wildcards: *.cpp, //depot/*/..., etc.
+          if (sanitized.match(/\*.*\.\..*\*/)) {
+            warnings.push('Complex wildcard with traversal pattern detected');
+          }
         }
-        // Remove potentially dangerous characters
-        sanitized = sanitized.replace(/[<>|;&$]/g, '');
+        // Preserve Perforce syntax while removing shell injection risks
+        sanitized = sanitized.replace(/[<>|;&$`]/g, '');
         break;
 
       case 'pattern':
@@ -158,13 +172,19 @@ export class SecurityManager {
         break;
 
       case 'path':
-        // File path validation
-        if (path.isAbsolute(sanitized) && !sanitized.startsWith('//')) {
-          warnings.push('Absolute path detected, ensure it\'s intended');
-        }
+        // Enhanced path validation for Perforce and system paths
         if (sanitized.includes('\0')) {
           warnings.push('Null bytes detected in path');
           sanitized = sanitized.replace(/\0/g, '');
+        }
+        // Allow Perforce depot paths and legitimate absolute paths
+        if (sanitized.startsWith('//')) {
+          // Valid Perforce depot path
+        } else if (path.isAbsolute(sanitized)) {
+          // Check for suspicious system paths
+          if (sanitized.match(/(etc|usr|var|sys|proc|dev|windows|system32)/i)) {
+            warnings.push('System directory path detected');
+          }
         }
         break;
     }

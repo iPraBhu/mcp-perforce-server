@@ -39,7 +39,7 @@ export async function p4Users(
   });
 
   if (result.ok && result.result) {
-    result.result = parse.parseUsersOutput(result.result as string);
+    result.result = parse.parseUsersOutput(result.result);
   }
 
   result.configUsed = {
@@ -71,7 +71,7 @@ export async function p4User(
   });
 
   if (result.ok && result.result) {
-    result.result = parse.parseUserOutput(result.result as string);
+    result.result = parse.parseUserOutput(result.result);
   }
 
   result.configUsed = {
@@ -106,7 +106,7 @@ export async function p4Clients(
   });
 
   if (result.ok && result.result) {
-    result.result = parse.parseClientsOutput(result.result as string);
+    result.result = parse.parseClientsOutput(result.result);
   }
 
   result.configUsed = {
@@ -138,7 +138,7 @@ export async function p4Client(
   });
 
   if (result.ok && result.result) {
-    result.result = parse.parseClientOutput(result.result as string);
+    result.result = parse.parseClientOutput(result.result);
   }
 
   result.configUsed = {
@@ -174,7 +174,7 @@ export async function p4Jobs(
   });
 
   if (result.ok && result.result) {
-    result.result = parse.parseJobsOutput(result.result as string);
+    result.result = parse.parseJobsOutput(result.result);
   }
 
   result.configUsed = {
@@ -215,7 +215,7 @@ export async function p4Job(
   });
 
   if (result.ok && result.result) {
-    result.result = parse.parseJobOutput(result.result as string);
+    result.result = parse.parseJobOutput(result.result);
   }
 
   result.configUsed = {
@@ -250,7 +250,7 @@ export async function p4Fixes(
   });
 
   if (result.ok && result.result) {
-    result.result = parse.parseFixesOutput(result.result as string);
+    result.result = parse.parseFixesOutput(result.result);
   }
 
   result.configUsed = {
@@ -289,7 +289,7 @@ export async function p4Labels(
   });
 
   if (result.ok && result.result) {
-    result.result = parse.parseLabelsOutput(result.result as string);
+    result.result = parse.parseLabelsOutput(result.result);
   }
 
   result.configUsed = {
@@ -330,7 +330,7 @@ export async function p4Label(
   });
 
   if (result.ok && result.result) {
-    result.result = parse.parseLabelOutput(result.result as string);
+    result.result = parse.parseLabelOutput(result.result);
   }
 
   result.configUsed = {
@@ -350,7 +350,7 @@ export async function p4Sizes(
 ): Promise<P4RunResult> {
   const { cwd, env, configResult } = await context.config.setupForCommand(args.workspacePath);
 
-  const cmdArgs: string[] = ['-s', '-z']; // Summary and human readable
+  const cmdArgs: string[] = ['-s']; // Summary only
   if (args.filespec) {
     cmdArgs.push(args.filespec);
   } else {
@@ -364,7 +364,7 @@ export async function p4Sizes(
   });
 
   if (result.ok && result.result) {
-    result.result = parse.parseSizesOutput(result.result as string);
+    result.result = parse.parseSizesOutput(result.result);
   }
 
   result.configUsed = {
@@ -396,7 +396,7 @@ export async function p4Have(
   });
 
   if (result.ok && result.result) {
-    result.result = parse.parseHaveOutput(result.result as string);
+    result.result = parse.parseHaveOutput(result.result);
   }
 
   result.configUsed = {
@@ -437,7 +437,7 @@ export async function p4Where(
   });
 
   if (result.ok && result.result) {
-    result.result = parse.parseWhereOutput(result.result as string);
+    result.result = parse.parseWhereOutput(result.result);
   }
 
   result.configUsed = {

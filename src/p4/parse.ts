@@ -9,8 +9,14 @@ export interface ParsedRecord {
 /**
  * Parse p4 -ztag output into structured data
  */
-export function parseZtagOutput(output: string): ParsedRecord[] {
+export function parseZtagOutput(output: string | any): ParsedRecord[] {
   const results: ParsedRecord[] = [];
+  
+  // Handle non-string inputs safely
+  if (!output || typeof output !== 'string') {
+    return results;
+  }
+  
   const lines = output.split('\n');
   let currentRecord: ParsedRecord = {};
   
@@ -45,8 +51,14 @@ export function parseZtagOutput(output: string): ParsedRecord[] {
 /**
  * Parse p4 info output into key-value pairs
  */
-export function parseInfoOutput(output: string): ParsedRecord {
+export function parseInfoOutput(output: string | any): ParsedRecord {
   const result: ParsedRecord = {};
+  
+  // Handle non-string inputs safely
+  if (!output || typeof output !== 'string') {
+    return result;
+  }
+  
   const lines = output.split('\n');
   
   for (const line of lines) {
@@ -70,8 +82,14 @@ export function parseInfoOutput(output: string): ParsedRecord {
 /**
  * Parse p4 opened output into file records
  */
-export function parseOpenedOutput(output: string): ParsedRecord[] {
+export function parseOpenedOutput(output: string | any): ParsedRecord[] {
   const results: ParsedRecord[] = [];
+  
+  // Handle non-string inputs safely
+  if (!output || typeof output !== 'string') {
+    return results;
+  }
+  
   const lines = output.split('\n').filter(line => line.trim());
   
   for (const line of lines) {
@@ -106,8 +124,14 @@ export function parseOpenedOutput(output: string): ParsedRecord[] {
 /**
  * Parse p4 changes output into changelist records
  */
-export function parseChangesOutput(output: string): ParsedRecord[] {
+export function parseChangesOutput(output: string | any): ParsedRecord[] {
   const results: ParsedRecord[] = [];
+  
+  // Handle non-string inputs safely
+  if (!output || typeof output !== 'string') {
+    return results;
+  }
+  
   const lines = output.split('\n').filter(line => line.trim());
   
   for (const line of lines) {
@@ -131,8 +155,14 @@ export function parseChangesOutput(output: string): ParsedRecord[] {
 /**
  * Parse p4 filelog output into file history records
  */
-export function parseFilelogOutput(output: string): ParsedRecord[] {
+export function parseFilelogOutput(output: string | any): ParsedRecord[] {
   const results: ParsedRecord[] = [];
+  
+  // Handle non-string inputs safely
+  if (!output || typeof output !== 'string') {
+    return results;
+  }
+  
   const lines = output.split('\n');
   let currentFile: ParsedRecord | null = null;
   let currentRevision: ParsedRecord | null = null;
@@ -184,8 +214,14 @@ export function parseFilelogOutput(output: string): ParsedRecord[] {
 /**
  * Parse p4 clients output into client records  
  */
-export function parseClientsOutput(output: string): ParsedRecord[] {
+export function parseClientsOutput(output: string | any): ParsedRecord[] {
   const results: ParsedRecord[] = [];
+  
+  // Handle non-string inputs safely
+  if (!output || typeof output !== 'string') {
+    return results;
+  }
+  
   const lines = output.split('\n').filter(line => line.trim());
   
   for (const line of lines) {
@@ -208,7 +244,17 @@ export function parseClientsOutput(output: string): ParsedRecord[] {
 /**
  * Parse p4 diff output into structured diff information
  */
-export function parseDiffOutput(output: string): ParsedRecord {
+export function parseDiffOutput(output: string | any): ParsedRecord {
+  // Handle non-string inputs safely
+  if (!output || typeof output !== 'string') {
+    return {
+      files: [],
+      totalFiles: 0,
+      totalAddedLines: 0,
+      totalRemovedLines: 0
+    } as ParsedRecord;
+  }
+  
   const lines = output.split('\n');
   const files: ParsedRecord[] = [];
   let currentFile: ParsedRecord | null = null;
@@ -270,8 +316,14 @@ export function parseDiffOutput(output: string): ParsedRecord {
 /**
  * Parse p4 sync output into sync records
  */
-export function parseSyncOutput(output: string): ParsedRecord[] {
+export function parseSyncOutput(output: string | any): ParsedRecord[] {
   const results: ParsedRecord[] = [];
+  
+  // Handle non-string inputs safely
+  if (!output || typeof output !== 'string') {
+    return results;
+  }
+  
   const lines = output.split('\n').filter(line => line.trim());
   
   for (const line of lines) {
@@ -296,8 +348,14 @@ export function parseSyncOutput(output: string): ParsedRecord[] {
 /**
  * Parse p4 resolve output into conflict resolution records
  */
-export function parseResolveOutput(output: string): ParsedRecord[] {
+export function parseResolveOutput(output: string | any): ParsedRecord[] {
   const results: ParsedRecord[] = [];
+  
+  // Handle non-string inputs safely
+  if (!output || typeof output !== 'string') {
+    return results;
+  }
+  
   const lines = output.split('\n').filter(line => line.trim());
   
   for (const line of lines) {
@@ -320,8 +378,14 @@ export function parseResolveOutput(output: string): ParsedRecord[] {
 /**
  * Parse p4 shelve output into shelved changelist records
  */
-export function parseShelveOutput(output: string): ParsedRecord[] {
+export function parseShelveOutput(output: string | any): ParsedRecord[] {
   const results: ParsedRecord[] = [];
+  
+  // Handle non-string inputs safely
+  if (!output || typeof output !== 'string') {
+    return results;
+  }
+  
   const lines = output.split('\n').filter(line => line.trim());
   
   for (const line of lines) {
@@ -342,8 +406,14 @@ export function parseShelveOutput(output: string): ParsedRecord[] {
 /**
  * Parse p4 unshelve output into unshelved records
  */
-export function parseUnshelveOutput(output: string): ParsedRecord[] {
+export function parseUnshelveOutput(output: string | any): ParsedRecord[] {
   const results: ParsedRecord[] = [];
+  
+  // Handle non-string inputs safely
+  if (!output || typeof output !== 'string') {
+    return results;
+  }
+  
   const lines = output.split('\n').filter(line => line.trim());
   
   for (const line of lines) {
@@ -365,8 +435,14 @@ export function parseUnshelveOutput(output: string): ParsedRecord[] {
 /**
  * Parse p4 blame/annotate output into line-by-line attribution
  */
-export function parseBlameOutput(output: string): ParsedRecord[] {
+export function parseBlameOutput(output: string | any): ParsedRecord[] {
   const results: ParsedRecord[] = [];
+  
+  // Handle non-string inputs safely
+  if (!output || typeof output !== 'string') {
+    return results;
+  }
+  
   const lines = output.split('\n').filter(line => line.trim());
   
   for (const line of lines) {
@@ -390,8 +466,14 @@ export function parseBlameOutput(output: string): ParsedRecord[] {
 /**
  * Parse p4 copy output into copied file records
  */
-export function parseCopyOutput(output: string): ParsedRecord[] {
+export function parseCopyOutput(output: string | any): ParsedRecord[] {
   const results: ParsedRecord[] = [];
+  
+  // Handle non-string inputs safely
+  if (!output || typeof output !== 'string') {
+    return results;
+  }
+  
   const lines = output.split('\n').filter(line => line.trim());
   
   for (const line of lines) {
@@ -415,8 +497,14 @@ export function parseCopyOutput(output: string): ParsedRecord[] {
 /**
  * Parse p4 move output into moved file records
  */
-export function parseMoveOutput(output: string): ParsedRecord[] {
+export function parseMoveOutput(output: string | any): ParsedRecord[] {
   const results: ParsedRecord[] = [];
+  
+  // Handle non-string inputs safely
+  if (!output || typeof output !== 'string') {
+    return results;
+  }
+  
   const lines = output.split('\n').filter(line => line.trim());
   
   for (const line of lines) {
@@ -440,8 +528,14 @@ export function parseMoveOutput(output: string): ParsedRecord[] {
 /**
  * Parse p4 grep output into search result records
  */
-export function parseGrepOutput(output: string): ParsedRecord[] {
+export function parseGrepOutput(output: string | any): ParsedRecord[] {
   const results: ParsedRecord[] = [];
+  
+  // Handle non-string inputs safely
+  if (!output || typeof output !== 'string') {
+    return results;
+  }
+  
   const lines = output.split('\n').filter(line => line.trim());
   
   for (const line of lines) {
@@ -463,8 +557,14 @@ export function parseGrepOutput(output: string): ParsedRecord[] {
 /**
  * Parse p4 files output into file records
  */
-export function parseFilesOutput(output: string): ParsedRecord[] {
+export function parseFilesOutput(output: string | any): ParsedRecord[] {
   const results: ParsedRecord[] = [];
+  
+  // Handle non-string inputs safely
+  if (!output || typeof output !== 'string') {
+    return results;
+  }
+  
   const lines = output.split('\n').filter(line => line.trim());
   
   for (const line of lines) {
@@ -488,8 +588,14 @@ export function parseFilesOutput(output: string): ParsedRecord[] {
 /**
  * Parse p4 dirs output into directory records
  */
-export function parseDirsOutput(output: string): ParsedRecord[] {
+export function parseDirsOutput(output: string | any): ParsedRecord[] {
   const results: ParsedRecord[] = [];
+  
+  // Handle non-string inputs safely
+  if (!output || typeof output !== 'string') {
+    return results;
+  }
+  
   const lines = output.split('\n').filter(line => line.trim());
   
   for (const line of lines) {
@@ -507,8 +613,14 @@ export function parseDirsOutput(output: string): ParsedRecord[] {
 /**
  * Parse p4 users output into user records
  */
-export function parseUsersOutput(output: string): ParsedRecord[] {
+export function parseUsersOutput(output: string | any): ParsedRecord[] {
   const results: ParsedRecord[] = [];
+  
+  // Handle non-string inputs safely
+  if (!output || typeof output !== 'string') {
+    return results;
+  }
+  
   const lines = output.split('\n').filter(line => line.trim());
   
   for (const line of lines) {
@@ -531,8 +643,14 @@ export function parseUsersOutput(output: string): ParsedRecord[] {
 /**
  * Parse p4 user output into user details
  */
-export function parseUserOutput(output: string): ParsedRecord {
+export function parseUserOutput(output: string | any): ParsedRecord {
   const result: ParsedRecord = {};
+  
+  // Handle non-string inputs safely
+  if (!output || typeof output !== 'string') {
+    return result;
+  }
+  
   const lines = output.split('\n');
   
   for (const line of lines) {
@@ -550,8 +668,14 @@ export function parseUserOutput(output: string): ParsedRecord {
 /**
  * Parse p4 client output into client details
  */
-export function parseClientOutput(output: string): ParsedRecord {
+export function parseClientOutput(output: string | any): ParsedRecord {
   const result: ParsedRecord = {};
+  
+  // Handle non-string inputs safely
+  if (!output || typeof output !== 'string') {
+    return result;
+  }
+  
   const lines = output.split('\n');
   
   for (const line of lines) {
@@ -569,8 +693,14 @@ export function parseClientOutput(output: string): ParsedRecord {
 /**
  * Parse p4 jobs output into job records
  */
-export function parseJobsOutput(output: string): ParsedRecord[] {
+export function parseJobsOutput(output: string | any): ParsedRecord[] {
   const results: ParsedRecord[] = [];
+  
+  // Handle non-string inputs safely
+  if (!output || typeof output !== 'string') {
+    return results;
+  }
+  
   const lines = output.split('\n').filter(line => line.trim());
   
   for (const line of lines) {
@@ -594,8 +724,14 @@ export function parseJobsOutput(output: string): ParsedRecord[] {
 /**
  * Parse p4 job output into job details
  */
-export function parseJobOutput(output: string): ParsedRecord {
+export function parseJobOutput(output: string | any): ParsedRecord {
   const result: ParsedRecord = {};
+  
+  // Handle non-string inputs safely
+  if (!output || typeof output !== 'string') {
+    return result;
+  }
+  
   const lines = output.split('\n');
   
   for (const line of lines) {
@@ -613,8 +749,14 @@ export function parseJobOutput(output: string): ParsedRecord {
 /**
  * Parse p4 fixes output into fix records
  */
-export function parseFixesOutput(output: string): ParsedRecord[] {
+export function parseFixesOutput(output: string | any): ParsedRecord[] {
   const results: ParsedRecord[] = [];
+  
+  // Handle non-string inputs safely
+  if (!output || typeof output !== 'string') {
+    return results;
+  }
+  
   const lines = output.split('\n').filter(line => line.trim());
   
   for (const line of lines) {
@@ -637,8 +779,14 @@ export function parseFixesOutput(output: string): ParsedRecord[] {
 /**
  * Parse p4 labels output into label records
  */
-export function parseLabelsOutput(output: string): ParsedRecord[] {
+export function parseLabelsOutput(output: string | any): ParsedRecord[] {
   const results: ParsedRecord[] = [];
+  
+  // Handle non-string inputs safely
+  if (!output || typeof output !== 'string') {
+    return results;
+  }
+  
   const lines = output.split('\n').filter(line => line.trim());
   
   for (const line of lines) {
@@ -660,8 +808,14 @@ export function parseLabelsOutput(output: string): ParsedRecord[] {
 /**
  * Parse p4 label output into label details
  */
-export function parseLabelOutput(output: string): ParsedRecord {
+export function parseLabelOutput(output: string | any): ParsedRecord {
   const result: ParsedRecord = {};
+  
+  // Handle non-string inputs safely
+  if (!output || typeof output !== 'string') {
+    return result;
+  }
+  
   const lines = output.split('\n');
   
   for (const line of lines) {
@@ -679,7 +833,16 @@ export function parseLabelOutput(output: string): ParsedRecord {
 /**
  * Parse p4 sizes output into size statistics
  */
-export function parseSizesOutput(output: string): ParsedRecord {
+export function parseSizesOutput(output: string | any): ParsedRecord {
+  // Handle non-string inputs safely
+  if (!output || typeof output !== 'string') {
+    return {
+      totalSize: 0,
+      fileCount: 0,
+      files: []
+    } as ParsedRecord;
+  }
+  
   const result: ParsedRecord = {};
   const lines = output.split('\n').filter(line => line.trim());
   
@@ -700,8 +863,14 @@ export function parseSizesOutput(output: string): ParsedRecord {
 /**
  * Parse p4 have output into synced file records
  */
-export function parseHaveOutput(output: string): ParsedRecord[] {
+export function parseHaveOutput(output: string | any): ParsedRecord[] {
   const results: ParsedRecord[] = [];
+  
+  // Handle non-string inputs safely
+  if (!output || typeof output !== 'string') {
+    return results;
+  }
+  
   const lines = output.split('\n').filter(line => line.trim());
   
   for (const line of lines) {
@@ -723,8 +892,14 @@ export function parseHaveOutput(output: string): ParsedRecord[] {
 /**
  * Parse p4 where output into mapping records
  */
-export function parseWhereOutput(output: string): ParsedRecord[] {
+export function parseWhereOutput(output: string | any): ParsedRecord[] {
   const results: ParsedRecord[] = [];
+  
+  // Handle non-string inputs safely
+  if (!output || typeof output !== 'string') {
+    return results;
+  }
+  
   const lines = output.split('\n').filter(line => line.trim());
   
   for (const line of lines) {

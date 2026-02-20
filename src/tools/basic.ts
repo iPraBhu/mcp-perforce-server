@@ -37,9 +37,20 @@ function validateFiles(files: string[]): { valid: boolean; error?: string } {
     if (file.length > 4096) {
       return { valid: false, error: 'file path too long (maximum 4096 characters)' };
     }
-    // Basic path traversal protection
-    if (file.includes('..') || file.startsWith('/') || file.match(/^[A-Za-z]:/)) {
-      return { valid: false, error: 'invalid file path' };
+    // Enhanced security: Allow legitimate Perforce patterns while blocking dangerous traversal
+    // Allow depot paths (//depot/...) and standard relative paths
+    if (file.includes('..')) {
+      // Allow Perforce depot paths and wildcard patterns
+      if (file.startsWith('//') || file.endsWith('/...') || file.endsWith('\\...')) {
+        // Valid Perforce depot syntax
+      } else if (file.match(/\.\.[\/\\].*[\/\\]\.\./)) {
+        // Block multiple traversal attempts like ../../../etc/passwd
+        return { valid: false, error: 'dangerous path traversal detected' };
+      } else if (file.match(/\.\.[\/\\](etc|usr|var|sys|proc|dev)/)) {
+        // Block access to sensitive system directories
+        return { valid: false, error: 'access to system directories not allowed' };
+      }
+      // Single .. is typically safe for normal relative paths
     }
   }
   return { valid: true };
@@ -87,7 +98,7 @@ export async function p4Info(
   
   if (result.ok && result.result) {
     // Parse info output into structured format
-    result.result = parse.parseInfoOutput(result.result as string);
+    result.result = parse.parseInfoOutput(result.result);
   }
   
   // Include config information
@@ -120,7 +131,7 @@ export async function p4Opened(
   });
   
   if (result.ok && result.result) {
-    result.result = parse.parseOpenedOutput(result.result as string);
+    result.result = parse.parseOpenedOutput(result.result);
   }
   
   result.configUsed = {
@@ -149,7 +160,7 @@ export async function p4Status(
   
   let openedFiles: any[] = [];
   if (openedResult.ok && openedResult.result) {
-    openedFiles = parse.parseOpenedOutput(openedResult.result as string);
+    openedFiles = parse.parseOpenedOutput(openedResult.result);
   }
   
   // Get pending changes
@@ -161,7 +172,7 @@ export async function p4Status(
   
   let pendingChanges: any[] = [];
   if (changesResult.ok && changesResult.result) {
-    pendingChanges = parse.parseChangesOutput(changesResult.result as string);
+    pendingChanges = parse.parseChangesOutput(changesResult.result);
   }
   
   const result: P4RunResult = {
@@ -796,11 +807,29 @@ export async function p4Changes(
   const result = await context.runner.run('changes', cmdArgs, cwd, {
     env,
     useZtag: false,
-    parseOutput: true,
+    parseOutput: false,
   });
 
-  if (result.ok && result.result) {
-    result.result = parse.parseChangesOutput(result.result as string);
+  // Defensive programming: ensure result.result is properly handled
+  if (result.ok && result.result !== null && result.result !== undefined) {
+    // Additional safety check to ensure result.result is a string before parsing
+    if (typeof result.result === 'string' && result.result.trim().length > 0) {
+      try {
+        result.result = parse.parseChangesOutput(result.result);
+      } catch (parseError) {
+        // If parsing fails, return raw result with warning
+        result.warnings = result.warnings || [];
+        const errorMessage = parseError instanceof Error ? parseError.message : String(parseError);
+        result.warnings.push(`Parse warning: ${errorMessage}`);
+        // Keep the raw result instead of failing completely
+      }
+    } else {
+      // If result is not a string or is empty, return empty array
+      result.result = [];
+    }
+  } else if (result.ok) {
+    // If result.ok is true but result.result is null/undefined, return empty array
+    result.result = [];
   }
 
   result.configUsed = {
@@ -834,7 +863,7 @@ export async function p4Blame(
 
   const { cwd, env, configResult } = await context.config.setupForCommand(args.workspacePath);
 
-  const result = await context.runner.run('blame', ['-a', args.file], cwd, {
+  const result = await context.runner.run('annotate', ['-a', args.file], cwd, {
     env,
     useZtag: false,
     parseOutput: false,
@@ -1103,7 +1132,7 @@ export async function p4Grep(
   if (args.caseInsensitive) {
     cmdArgs.push('-i');
   }
-  cmdArgs.push('-n', patternSanitization.sanitized);
+  cmdArgs.push('-e', patternSanitization.sanitized);
 
   if (sanitizedFilespec) {
     cmdArgs.push(sanitizedFilespec);

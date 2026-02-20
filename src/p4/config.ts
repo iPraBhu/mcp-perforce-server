@@ -16,40 +16,56 @@ export interface P4ServerConfig {
 
 export class P4Config {
   private static readonly DEFAULT_CONFIG_NAME = '.p4config';
+  private configCache = new Map<string, { result: P4ConfigResult; timestamp: number }>();
+  private readonly CACHE_TTL = parseInt(process.env.P4_CONFIG_CACHE_TTL || '300000'); // 5 minutes default
   
   /**
    * Find .p4config file by searching upward from the given directory
    */
   async findConfig(startPath: string = process.cwd()): Promise<P4ConfigResult> {
     const configName = process.env.P4CONFIG || P4Config.DEFAULT_CONFIG_NAME;
+    const cacheKey = `${startPath}:${configName}`;
+    
+    // Check cache first for performance
+    const cached = this.configCache.get(cacheKey);
+    if (cached && (Date.now() - cached.timestamp) < this.CACHE_TTL) {
+      return cached.result;
+    }
     
     try {
       const { configPath, projectRoot } = await this.searchUpward(startPath, configName);
       
+      let result: P4ConfigResult;
       if (!configPath || !projectRoot) {
-        return {
+        result = {
           found: false,
           config: {},
           environment: { P4CONFIG: configName },
         };
+      } else {
+        const config = await this.parseConfigFile(configPath);
+        const environment = this.buildEnvironment(config, configName);
+        
+        result = {
+          found: true,
+          configPath,
+          projectRoot,
+          config,
+          environment,
+        };
       }
       
-      const config = await this.parseConfigFile(configPath);
-      const environment = this.buildEnvironment(config, configName);
-      
-      return {
-        found: true,
-        configPath,
-        projectRoot,
-        config,
-        environment,
-      };
+      // Cache the result for future use
+      this.configCache.set(cacheKey, { result, timestamp: Date.now() });
+      return result;
     } catch (error) {
-      return {
+      const result = {
         found: false,
         config: {},
         environment: { P4CONFIG: configName },
       };
+      this.configCache.set(cacheKey, { result, timestamp: Date.now() });
+      return result;
     }
   }
   
