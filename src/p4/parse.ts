@@ -132,11 +132,14 @@ export function parseChangesOutput(output: string | any): ParsedRecord[] {
     return results;
   }
   
-  const lines = output.split('\n').filter(line => line.trim());
+  const lines = output.split('\n').filter(line => line.trim()).map(line => line.trim());
   
   for (const line of lines) {
+    // Remove "info: " prefix if present (from -s flag output)
+    const cleanLine = line.replace(/^info:\s*/, '');
+    
     // Format: "Change 12345 on 2023/01/01 by user@client 'Description...'"
-    const match = line.match(/^Change\s+(\d+)\s+on\s+(\S+)\s+by\s+(.+?)@(.+?)\s+'(.*)'/);
+    const match = cleanLine.match(/^Change\s+(\d+)\s+on\s+(\S+)\s+by\s+(.+?)@(.+?)\s+'(.*)'/);
     if (match) {
       const [, change, date, user, client, description] = match;
       results.push({
