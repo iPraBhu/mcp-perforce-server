@@ -1,34 +1,52 @@
 # MCP Perforce Server Configuration Examples
 
-## Silent Operation Configuration
+All examples in this document use the default safe profile: read-only enabled and delete disabled.
 
-To prevent VS Code from asking for approval on every command and to hide terminal execution:
+## Client Config Fields
 
-**Key Settings:**
-- `"alwaysAllow": ["p4.*"]` or `"alwaysAllow": true` - Auto-approve all p4 commands
-- `"LOG_LEVEL": "error"` - Minimize console output (only show errors)
-- `"disabled": false` - Ensure server is enabled
+| Field | Required | Example | Description |
+|---|---|---|---|
+| `command` | Yes | `"mcp-perforce-server"` | Executable to start the MCP server. |
+| `args` | No | `[]` or `["/path/to/dist/server.js"]` | Command arguments (use for local build path). |
+| `env` | No | `{ "P4_READONLY_MODE": "true" }` | Server environment variables. |
+| `alwaysAllow` | Client-specific | `["p4.*"]` or `true` | Auto-approve tool calls to reduce prompts. |
+| `disabled` | Client-specific | `false` | Enables/disables the server entry. |
 
-## Authentication Configuration
+## Authentication Options
 
-**Important:** Configure your Perforce credentials using one of these methods:
+| Method | Recommended | How it works |
+|---|---|---|
+| `.p4config` file | Yes | Place Perforce variables in a `.p4config` file in your project/workspace root. |
+| MCP `env` variables | Optional | Put Perforce variables directly in the MCP server config JSON. |
 
-1. **`.p4config` file** (Recommended) - Create in project root:
-   ```
-   P4PORT=perforce-server:1666
-   P4USER=your-username
-   P4CLIENT=your-workspace-name
-   P4PASSWD=your-password
-   ```
+`.p4config` example:
 
-2. **Environment variables** in MCP config (see examples below)
+```ini
+P4PORT=perforce-server:1666
+P4USER=your-username
+P4CLIENT=your-workspace-name
+P4PASSWD=your-password
+```
 
-The server automatically detects and uses these credentials. Passwords are masked in logs for security.
+## Environment Variables Used In Examples
+
+| Variable | Example Value | Default | Purpose |
+|---|---|---|---|
+| `P4_READONLY_MODE` | `"true"` | `true` | Keeps server in read-only mode. |
+| `P4_DISABLE_DELETE` | `"true"` | `true` | Keeps delete operations disabled. |
+| `LOG_LEVEL` | `"error"` | `warn` | Keeps console output minimal. |
+| `P4PORT` | `"perforce-server:1666"` | unset | Perforce server address (required if not in `.p4config`). |
+| `P4USER` | `"your-username"` | unset | Perforce user (required if not in `.p4config`). |
+| `P4CLIENT` | `"your-workspace-name"` | unset | Perforce client/workspace (required if not in `.p4config`). |
+| `P4PASSWD` | `"your-password"` | unset | Password/ticket (optional depending on server auth). |
+| `P4CHARSET` | `"utf8"` | unset | Optional Perforce charset. |
+
+For the complete server configuration table (all supported env vars), see [README.md](README.md#server-configuration-reference).
 
 ## VS Code with Claude Dev/Cline
 
-### Option 1: Using .p4config file (Recommended)
-Create a `.p4config` file in your project root, then:
+### Option 1: Using `.p4config` (Recommended)
+
 ```json
 {
   "mcpServers": {
@@ -36,7 +54,7 @@ Create a `.p4config` file in your project root, then:
       "command": "mcp-perforce-server",
       "args": [],
       "env": {
-        "P4_READONLY_MODE": "false",
+        "P4_READONLY_MODE": "true",
         "P4_DISABLE_DELETE": "true",
         "LOG_LEVEL": "error"
       },
@@ -47,7 +65,8 @@ Create a `.p4config` file in your project root, then:
 }
 ```
 
-### Option 2: Direct configuration in MCP config
+### Option 2: Direct MCP Env Configuration
+
 ```json
 {
   "mcpServers": {
@@ -60,7 +79,7 @@ Create a `.p4config` file in your project root, then:
         "P4CLIENT": "your-workspace-name",
         "P4PASSWD": "your-password",
         "P4CHARSET": "utf8",
-        "P4_READONLY_MODE": "false",
+        "P4_READONLY_MODE": "true",
         "P4_DISABLE_DELETE": "true",
         "LOG_LEVEL": "error"
       },
@@ -73,7 +92,8 @@ Create a `.p4config` file in your project root, then:
 
 ## Cursor IDE
 
-### Option 1: Using .p4config file (Recommended)
+### Option 1: Using `.p4config` (Recommended)
+
 ```json
 {
   "mcp": {
@@ -82,7 +102,7 @@ Create a `.p4config` file in your project root, then:
         "command": "mcp-perforce-server",
         "args": [],
         "env": {
-          "P4_READONLY_MODE": "false", 
+          "P4_READONLY_MODE": "true",
           "P4_DISABLE_DELETE": "true",
           "LOG_LEVEL": "error"
         },
@@ -93,7 +113,8 @@ Create a `.p4config` file in your project root, then:
 }
 ```
 
-### Option 2: Direct configuration in MCP config
+### Option 2: Direct MCP Env Configuration
+
 ```json
 {
   "mcp": {
@@ -103,10 +124,10 @@ Create a `.p4config` file in your project root, then:
         "args": [],
         "env": {
           "P4PORT": "perforce-server:1666",
-          "P4USER": "your-username", 
+          "P4USER": "your-username",
           "P4CLIENT": "your-workspace-name",
           "P4PASSWD": "your-password",
-          "P4_READONLY_MODE": "false",
+          "P4_READONLY_MODE": "true",
           "P4_DISABLE_DELETE": "true",
           "LOG_LEVEL": "error"
         },
@@ -119,10 +140,15 @@ Create a `.p4config` file in your project root, then:
 
 ## Claude Desktop
 
-### macOS: ~/Library/Application Support/Claude/claude_desktop_config.json
-### Windows: %APPDATA%\Claude\claude_desktop_config.json
+Config file paths:
 
-### Option 1: Using .p4config file (Recommended)
+| Platform | Path |
+|---|---|
+| macOS | `~/Library/Application Support/Claude/claude_desktop_config.json` |
+| Windows | `%APPDATA%\Claude\claude_desktop_config.json` |
+
+### Option 1: Using `.p4config` (Recommended)
+
 ```json
 {
   "mcpServers": {
@@ -130,7 +156,7 @@ Create a `.p4config` file in your project root, then:
       "command": "mcp-perforce-server",
       "args": [],
       "env": {
-        "P4_READONLY_MODE": "false",
+        "P4_READONLY_MODE": "true",
         "P4_DISABLE_DELETE": "true",
         "LOG_LEVEL": "error"
       },
@@ -140,7 +166,8 @@ Create a `.p4config` file in your project root, then:
 }
 ```
 
-### Option 2: Direct configuration in MCP config
+### Option 2: Direct MCP Env Configuration
+
 ```json
 {
   "mcpServers": {
@@ -150,8 +177,8 @@ Create a `.p4config` file in your project root, then:
       "env": {
         "P4PORT": "perforce-server:1666",
         "P4USER": "your-username",
-        "P4CLIENT": "your-workspace-name", 
-        "P4_READONLY_MODE": "false",
+        "P4CLIENT": "your-workspace-name",
+        "P4_READONLY_MODE": "true",
         "P4_DISABLE_DELETE": "true",
         "LOG_LEVEL": "error"
       },
@@ -161,9 +188,9 @@ Create a `.p4config` file in your project root, then:
 }
 ```
 
-## Local Development Setup (if not globally installed)
+## Local Development Setup (If Not Globally Installed)
 
-Replace the "command" field with the full path to your built server:
+Replace `command` with `node` and point `args` at your built server:
 
 ```json
 {
@@ -172,52 +199,16 @@ Replace the "command" field with the full path to your built server:
 }
 ```
 
-## Safety Configuration Levels
+## Safety Profile Used In This Document
 
-### Maximum Safety (Default)
-```json
-{
-  "env": {
-    "P4_READONLY_MODE": "true",
-    "P4_DISABLE_DELETE": "true"
-  }
-}
-```
+| Profile | `P4_READONLY_MODE` | `P4_DISABLE_DELETE` | Behavior |
+|---|---|---|---|
+| Default safe profile | `true` | `true` | Read-only; write tools and delete operations blocked by default. |
 
-### Write-enabled, Delete Protected  
-```json
-{
-  "env": {
-    "P4_READONLY_MODE": "false",
-    "P4_DISABLE_DELETE": "true"
-  }
-}
-```
+## Troubleshooting
 
-## Configuration Notes
-
-### Silent Operation
-- `"alwaysAllow": ["p4.*"]` - Auto-approves all p4 commands, preventing VS Code approval prompts
-- `"alwaysAllow": true` - Auto-approves all commands (Cursor)
-- `"LOG_LEVEL": "error"` - Reduces console output to errors only
-- `"disabled": false` - Ensures the server is active
-
-### Security Levels
-- **Safe**: `P4_READONLY_MODE=true, P4_DISABLE_DELETE=true` (read-only)
-- **Recommended**: `P4_READONLY_MODE=false, P4_DISABLE_DELETE=true` (write, no delete)  
-- **Full Access**: `P4_READONLY_MODE=false, P4_DISABLE_DELETE=false` (use with caution)
-
-### Troubleshooting
-- If commands still show approval prompts, ensure `alwaysAllow` is configured
-- If you see terminal output, set `LOG_LEVEL` to `"error"`
-- Commands execute silently in the background without terminal windows
-
-### Full Access (Use with Caution)
-```json
-{
-  "env": {
-    "P4_READONLY_MODE": "false", 
-    "P4_DISABLE_DELETE": "false"
-  }
-}
-```
+| Symptom | Check |
+|---|---|
+| Approval prompts still appear | Ensure `alwaysAllow` is configured for your client. |
+| Too much terminal output | Set `LOG_LEVEL` to `"error"`. |
+| Perforce auth/config errors | Verify `P4PORT`, `P4USER`, `P4CLIENT` are set via `.p4config` or MCP `env`. |

@@ -1,4 +1,4 @@
-﻿# MCP Perforce Server
+# MCP Perforce Server
 
 [![npm version](https://badge.fury.io/js/mcp-perforce-server.svg)](https://www.npmjs.com/package/mcp-perforce-server)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -18,9 +18,7 @@ npm install -g mcp-perforce-server
 ## Quick Start
 
 1. Make sure `p4` is installed and available in `PATH`.
-2. Configure Perforce credentials using either:
-   - `.p4config` in your workspace/project root, or
-   - MCP `env` variables.
+2. Configure Perforce credentials using either `.p4config` in your workspace/project root, or MCP `env` variables.
 3. Add MCP server config in your IDE/client.
 
 ### Example `.p4config`
@@ -32,7 +30,7 @@ P4CLIENT=your-workspace-name
 P4PASSWD=your-password
 ```
 
-### Global Install MCP Config
+### Global Install MCP Config (Read-Only Profile)
 
 ```json
 {
@@ -40,7 +38,7 @@ P4PASSWD=your-password
     "perforce": {
       "command": "mcp-perforce-server",
       "env": {
-        "P4_READONLY_MODE": "false",
+        "P4_READONLY_MODE": "true",
         "P4_DISABLE_DELETE": "true",
         "LOG_LEVEL": "error"
       }
@@ -49,7 +47,7 @@ P4PASSWD=your-password
 }
 ```
 
-### Local Repo MCP Config
+### Local Repo MCP Config (Read-Only Profile)
 
 ```json
 {
@@ -58,7 +56,7 @@ P4PASSWD=your-password
       "command": "node",
       "args": ["/absolute/path/to/mcp-perforce-server/dist/server.js"],
       "env": {
-        "P4_READONLY_MODE": "false",
+        "P4_READONLY_MODE": "true",
         "P4_DISABLE_DELETE": "true",
         "LOG_LEVEL": "error"
       }
@@ -80,24 +78,64 @@ Windows `args` example:
 }
 ```
 
-## Safe Defaults
+## Default Access Model
 
-- `P4_READONLY_MODE=true`
-- `P4_DISABLE_DELETE=true`
-- `P4_PERFORMANCE_MODE=fast`
-
-## Key Environment Variables
-
-| Variable | Purpose | Default |
+| Setting | Default | Effect |
 |---|---|---|
-| `P4_READONLY_MODE` | Block write operations | `true` |
-| `P4_DISABLE_DELETE` | Block delete operations | `true` |
-| `P4_PERFORMANCE_MODE` | `fast`, `balanced`, `secure` | `fast` |
-| `P4_TIMEOUT_MS` | Command timeout (ms) | mode-based |
-| `P4_RESPONSE_CACHE` | Read-result cache | `true` |
-| `P4_PRETTY_JSON` | Pretty JSON responses | `false` |
-| `P4CONFIG` | Config file name | `.p4config` |
-| `LOG_LEVEL` | `error`, `warn`, `info`, `debug` | `warn` |
+| `P4_READONLY_MODE` | `true` | Blocks all write-capable tools. |
+| `P4_DISABLE_DELETE` | `true` | Blocks `p4.delete` even when write mode is enabled. |
+
+Write-capable tools blocked when `P4_READONLY_MODE=true`:
+
+| Tool |
+|---|
+| `p4.add`, `p4.edit`, `p4.delete`, `p4.revert`, `p4.sync` |
+| `p4.changelist.create`, `p4.changelist.update`, `p4.changelist.submit`, `p4.submit` |
+| `p4.resolve`, `p4.shelve`, `p4.unshelve` |
+| `p4.copy`, `p4.move`, `p4.integrate`, `p4.merge` |
+
+## Server Configuration Reference
+
+### Runtime, Safety, and Performance
+
+| Variable | Default | Description |
+|---|---|---|
+| `P4_READONLY_MODE` | `true` | Read-only by default. Set to `false` to enable write-capable tools. |
+| `P4_DISABLE_DELETE` | `true` | Delete operations are disabled by default. Set to `false` to allow `p4.delete`. |
+| `P4_PATH` | `p4` / `p4.exe` | Custom path to Perforce CLI executable. |
+| `P4CONFIG` | `.p4config` | `.p4config` file name used for upward discovery. |
+| `LOG_LEVEL` | `warn` | Logging level: `error`, `warn`, `info`, `debug`. |
+| `P4_PRETTY_JSON` | `false` | Pretty-print JSON responses when `true`. |
+| `P4_PERFORMANCE_MODE` | `fast` | Preset: `fast`, `balanced`, `secure`. |
+| `P4_TIMEOUT_MS` | `5000` / `10000` / `15000` | Command timeout in ms (`fast` / `balanced` / `secure`). |
+| `P4_CONFIG_CACHE_TTL` | `600000` / `300000` / `300000` | `.p4config` cache TTL in ms (`fast` / `balanced` / `secure`). |
+| `P4_RESPONSE_CACHE` | `true` | Enable/disable read-result response cache. |
+| `P4_RESPONSE_CACHE_TTL_MS` | `5000` / `3000` / `1000` | Response cache TTL in ms (`fast` / `balanced` / `secure`). |
+| `P4_RESPONSE_CACHE_MAX_ENTRIES` | `400` / `250` / `100` | Max cached read responses (`fast` / `balanced` / `secure`). |
+| `P4_ENABLE_AUDIT_LOGGING` | `false` / `false` / `true` | Override audit logging (`fast` / `balanced` / `secure`). |
+| `P4_ENABLE_RATE_LIMITING` | `false` / `false` / `true` | Override rate limiting (`fast` / `balanced` / `secure`). |
+| `P4_ENABLE_MEMORY_LIMITS` | `false` / `true` / `true` | Override memory-limit checks (`fast` / `balanced` / `secure`). |
+| `P4_ENABLE_INPUT_SANITIZATION` | `true` | Input sanitization is enabled unless set to `false`. |
+| `P4_MAX_MEMORY_MB` | `512` | Memory limit for command execution and checks. |
+| `P4_AUDIT_RETENTION_DAYS` | `90` | Number of days audit entries are retained. |
+| `P4_RATE_LIMIT_REQUESTS` | `100` | Max requests per rate-limit window. |
+| `P4_RATE_LIMIT_WINDOW_MS` | `600000` | Rate-limit window in milliseconds. |
+| `P4_RATE_LIMIT_BLOCK_MS` | `3600000` | Block duration in milliseconds after exceeding limit. |
+
+### Perforce Connection Variables
+
+| Variable | Required | Description |
+|---|---|---|
+| `P4PORT` | Yes | Perforce server address (for example `ssl:perforce.example.com:1666`). |
+| `P4USER` | Yes | Perforce username. |
+| `P4CLIENT` | Yes | Perforce client/workspace name. |
+| `P4PASSWD` | No | Password or ticket (masked in server output). |
+| `P4CHARSET` | No | Character set (for example `utf8`). |
+| `P4COMMANDCHARSET` | No | Command charset override. |
+| `P4LANGUAGE` | No | Localized language setting. |
+| `P4DIFF` | No | Custom diff tool command. |
+| `P4MERGE` | No | Custom merge tool command. |
+| `P4EDITOR` | No | Editor for changelist descriptions/spec forms. |
 
 ## Tool Coverage
 
@@ -125,6 +163,3 @@ npm run test:integration
 ## License
 
 MIT
-
-
-

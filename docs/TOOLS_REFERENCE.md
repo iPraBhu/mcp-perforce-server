@@ -1,4 +1,4 @@
-﻿# MCP Perforce Tool Reference
+# MCP Perforce Tool Reference
 
 This document contains the detailed reference for all MCP tools exposed by this server.
 
@@ -6,12 +6,20 @@ This document contains the detailed reference for all MCP tools exposed by this 
 
 - All tools return structured JSON (`ok`, `result`, optional `error`, optional `warnings`, `configUsed`).
 - Most tools accept `workspacePath` (optional) to control where `.p4config` is discovered.
-- Read/write safety is controlled by:
-  - `P4_READONLY_MODE`
-  - `P4_DISABLE_DELETE`
-- `p4.diff` and `p4.diff2` are different:
-  - `p4.diff`: workspace/local vs depot.
-  - `p4.diff2`: depot-to-depot server-side comparison.
+
+Safety controls:
+
+| Variable | Default | Behavior |
+|---|---|---|
+| `P4_READONLY_MODE` | `true` | Blocks write-capable tools (`p4.add`, `p4.edit`, `p4.delete`, `p4.revert`, `p4.sync`, changelist submit/update/create, resolve/shelve/unshelve, copy/move/integrate/merge). |
+| `P4_DISABLE_DELETE` | `true` | Blocks `p4.delete` even if write mode is enabled. |
+
+Diff behavior:
+
+| Tool | Behavior |
+|---|---|
+| `p4.diff` | Workspace/local vs depot comparison. |
+| `p4.diff2` | Depot-to-depot server-side comparison (no workspace mapping required). |
 
 ## Repository Operations
 
