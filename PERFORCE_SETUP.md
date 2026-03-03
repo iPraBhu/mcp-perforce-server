@@ -1,59 +1,110 @@
-# Perforce Environment Configuration Example
+﻿# Perforce Setup
 
-# Required environment variables for your Perforce connection:
-P4PORT=your-perforce-server:1666          # Your Perforce server address
-P4USER=your-username                       # Your Perforce username  
-P4CLIENT=your-workspace-name               # Your workspace/client name
-P4PASSWD=your-password                     # Your Perforce password (optional if using tickets)
+Use this guide to configure Perforce credentials and runtime settings for `mcp-perforce-server`.
 
-# Optional configuration:
-P4CONFIG=.p4config                         # Use .p4config files for per-project settings
+## 1. Required Perforce Variables
 
-# Example PowerShell commands to set these:
+Set these using either a `.p4config` file (recommended) or environment variables.
+
+```ini
+P4PORT=your-perforce-server:1666
+P4USER=your-username
+P4CLIENT=your-workspace-name
+P4PASSWD=your-password
+```
+
+## 2. Recommended `.p4config` Setup
+
+Create a `.p4config` file in your project/workspace root:
+
+```ini
+P4PORT=perforce.yourcompany.com:1666
+P4USER=your-username
+P4CLIENT=your-workspace
+P4PASSWD=your-password
+```
+
+Optional custom config file name:
+
+```ini
+P4CONFIG=.p4config
+```
+
+## 3. PowerShell Environment Setup (Windows)
+
+```powershell
 $env:P4PORT = "perforce.yourcompany.com:1666"
 $env:P4USER = "your-username"
 $env:P4CLIENT = "your-workspace"
+$env:P4PASSWD = "your-password"
+```
 
-# Or create a .p4config file in your project directory with:
-# P4PORT=perforce.yourcompany.com:1666
-# P4USER=your-username  
-# P4CLIENT=your-workspace
+## 4. Performance Profiles
 
-# ============================================
-# PERFORMANCE OPTIMIZATION SETTINGS
-# ============================================
+Default mode is `fast`.
 
-# For Development (Maximum Speed):
+### Fast (default)
+
+```ini
 P4_PERFORMANCE_MODE=fast
 P4_TIMEOUT_MS=5000
+P4_CONFIG_CACHE_TTL=600000
+P4_RESPONSE_CACHE=true
+P4_RESPONSE_CACHE_TTL_MS=5000
+P4_RESPONSE_CACHE_MAX_ENTRIES=400
 P4_ENABLE_RATE_LIMITING=false
 P4_ENABLE_MEMORY_LIMITS=false
 P4_ENABLE_AUDIT_LOGGING=false
-P4_CONFIG_CACHE_TTL=600000
+```
 
-# For Production (Security + Performance Balance):
+### Balanced
+
+```ini
+P4_PERFORMANCE_MODE=balanced
+P4_TIMEOUT_MS=10000
+P4_CONFIG_CACHE_TTL=300000
+P4_RESPONSE_CACHE=true
+P4_RESPONSE_CACHE_TTL_MS=3000
+P4_RESPONSE_CACHE_MAX_ENTRIES=250
+P4_ENABLE_RATE_LIMITING=false
+P4_ENABLE_MEMORY_LIMITS=true
+P4_ENABLE_AUDIT_LOGGING=false
+```
+
+### Secure
+
+```ini
 P4_PERFORMANCE_MODE=secure
 P4_TIMEOUT_MS=15000
+P4_CONFIG_CACHE_TTL=300000
+P4_RESPONSE_CACHE=true
+P4_RESPONSE_CACHE_TTL_MS=1000
+P4_RESPONSE_CACHE_MAX_ENTRIES=100
 P4_ENABLE_RATE_LIMITING=true
 P4_ENABLE_MEMORY_LIMITS=true
 P4_ENABLE_AUDIT_LOGGING=true
-P4_CONFIG_CACHE_TTL=300000
+```
 
-# Custom Performance Tuning:
-P4_MAX_MEMORY_MB=1024                      # Memory limit in MB
-P4_RATE_LIMIT_REQUESTS=100                 # Max requests per window
-P4_RATE_LIMIT_WINDOW_MS=600000             # Rate limit window (10 minutes)
+## 5. Security Controls
 
-# ============================================
-# SECURITY & COMPLIANCE SETTINGS  
-# ============================================
+```ini
+P4_READONLY_MODE=true
+P4_DISABLE_DELETE=true
+P4_ENABLE_INPUT_SANITIZATION=true
+```
 
-# Basic Security:
-P4_READONLY_MODE=true                      # Enable read-only mode
-P4_DISABLE_DELETE=true                     # Disable delete operations
-P4_ENABLE_INPUT_SANITIZATION=true         # Enable input validation
+Additional controls:
 
-# Enterprise Security Features:
-P4_ENABLE_AUDIT_LOGGING=true               # Enable audit logging
-P4_AUDIT_RETENTION_DAYS=90                 # Audit log retention period
-P4_ENABLE_SECURITY=true                    # Enable all security features
+```ini
+P4_MAX_MEMORY_MB=512
+P4_AUDIT_RETENTION_DAYS=90
+P4_RATE_LIMIT_REQUESTS=100
+P4_RATE_LIMIT_WINDOW_MS=600000
+P4_RATE_LIMIT_BLOCK_MS=3600000
+```
+
+## 6. Notes
+
+- Do not commit real credentials to source control.
+- `.p4config` discovery is automatic (searched upward from `workspacePath`/current directory).
+- For details on all tools and args, see `docs/TOOLS_REFERENCE.md`.

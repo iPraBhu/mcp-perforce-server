@@ -7,6 +7,8 @@
 
 MCP server for Perforce (P4) with safe defaults, fast execution, and structured JSON responses.
 
+> Developed with vibe coding for practical Perforce automation workflows.
+
 ## Install
 
 ```bash
@@ -123,5 +125,6 @@ npm run test:integration
 ## License
 
 MIT
+
 
 
