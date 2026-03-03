@@ -85,9 +85,18 @@ This document describes all available agents (tools) provided by the MCP Perforc
 **Description**: Show differences between workspace and depot versions  
 **Parameters**:
 - `files` (optional): Specific files to diff
-- `changelist` (optional): Compare against specific changelist
+- `summary` (optional): Show summary only (like `p4 diff -s`)
 - `workspacePath` (optional): Path to workspace directory  
 **Returns**: Unified diff output showing changes
+
+#### `p4.diff2`
+**Description**: Compare two depot paths server-side (equivalent to `p4 diff2`; no workspace mapping required)  
+**Parameters**:
+- `sourcePath`: First depot path/filespec to compare
+- `targetPath`: Second depot path/filespec to compare
+- `summaryOnly` (optional, default true): If true, list only differing files (like `p4 diff2 -q`); if false, include full diff output
+- `workspacePath` (optional): Path to workspace directory for P4 config context  
+**Returns**: Depot-to-depot diff results including differing file pairs and optional diff content
 
 #### `p4.copy`
 **Description**: Copy files between locations  
@@ -171,11 +180,11 @@ This document describes all available agents (tools) provided by the MCP Perforc
 **Returns**: Submission results
 
 #### `p4.describe`
-**Description**: Get detailed changelist information  
+**Description**: Get detailed changelist information (equivalent to `p4 describe -s`)  
 **Parameters**:
-- `changelist`: Changelist number to describe
+- `changelist`: Changelist number to describe (string or number)
 - `workspacePath` (optional): Path to workspace directory  
-**Returns**: Complete changelist details including files and description
+**Returns**: Complete changelist details including change metadata, description text, and affected files with revision/action
 
 #### `p4.changes`
 **Description**: List changelists with filtering  

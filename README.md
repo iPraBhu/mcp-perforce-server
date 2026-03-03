@@ -326,7 +326,8 @@ P4_RATE_LIMIT_BLOCK_MS=3600000
 - `p4.edit` - Open files for edit
 - `p4.delete` - Mark files for deletion
 - `p4.revert` - Revert changes
-- `p4.diff` - Show file differences
+- `p4.diff` - Show workspace file differences (opened/local vs depot)
+- `p4.diff2` - Compare two depot paths server-side (depot-to-depot diff)
 - `p4.copy` - Copy files between locations
 - `p4.move` - Move/rename files
 - `p4.blame` - Show file annotations (like git blame)
@@ -341,7 +342,7 @@ P4_RATE_LIMIT_BLOCK_MS=3600000
 - `p4.changelist.update` - Update changelist
 - `p4.changelist.submit` - Submit changelist
 - `p4.submit` - Submit default changelist
-- `p4.describe` - Describe changelist details
+- `p4.describe` - Describe changelist details (`p4 describe -s`, including affected files/actions)
 - `p4.changes` - List changelists with filtering
 
 ### Search & Discovery
@@ -375,8 +376,65 @@ P4_RATE_LIMIT_BLOCK_MS=3600000
 
 ## Integration
 
-### VS Code / Cursor
-For silent operation without approval prompts, add these settings:
+### Shared MCP Server Block (Global Install)
+Use this when `mcp-perforce-server` is installed globally (`npm install -g mcp-perforce-server`):
+```json
+{
+  "mcpServers": {
+    "perforce": {
+      "command": "mcp-perforce-server",
+      "env": {
+        "P4_READONLY_MODE": "false",
+        "LOG_LEVEL": "error"
+      }
+    }
+  }
+}
+```
+
+If your MCP client supports tool allow-lists, you can additionally allow `p4.*` tools in that client's own allow-list setting.
+
+### Local MCP Setup (Run From Local Repo Path)
+Use this if you are running from a local clone instead of a global npm install.
+
+1. Build once:
+```bash
+npm install
+npm run build
+```
+
+2. Point your MCP client to the local server entrypoint:
+```json
+{
+  "mcpServers": {
+    "perforce": {
+      "command": "node",
+      "args": ["/absolute/path/to/mcp-perforce-server/dist/server.js"],
+      "env": {
+        "P4_READONLY_MODE": "false",
+        "LOG_LEVEL": "error"
+      }
+    }
+  }
+}
+```
+
+Windows example for `args`:
+```json
+{
+  "mcpServers": {
+    "perforce": {
+      "command": "node",
+      "args": ["C:\\Tools\\git-projects\\mcp-perforce-server\\dist\\server.js"]
+    }
+  }
+}
+```
+
+### Popular IDE / Client Config
+
+#### Cursor
+Add to Cursor MCP settings JSON:
 ```json
 {
   "mcpServers": {
@@ -386,16 +444,45 @@ For silent operation without approval prompts, add these settings:
         "P4_READONLY_MODE": "false",
         "LOG_LEVEL": "error"
       },
-      "alwaysAllow": ["p4.*"],
-      "disabled": false
+      "alwaysAllow": ["p4.*"]
     }
   }
 }
 ```
 
-See [MCP_CONFIG_EXAMPLES.md](MCP_CONFIG_EXAMPLES.md) for IDE-specific configuration.
+#### VS Code (Cline / Roo Code / MCP Extensions)
+Add to your extension MCP server settings JSON:
+```json
+{
+  "mcpServers": {
+    "perforce": {
+      "command": "mcp-perforce-server",
+      "env": {
+        "P4_READONLY_MODE": "false",
+        "LOG_LEVEL": "error"
+      }
+    }
+  }
+}
+```
 
-### Claude Desktop
+#### Windsurf
+Add to Windsurf MCP server settings JSON:
+```json
+{
+  "mcpServers": {
+    "perforce": {
+      "command": "mcp-perforce-server",
+      "env": {
+        "P4_READONLY_MODE": "false",
+        "LOG_LEVEL": "error"
+      }
+    }
+  }
+}
+```
+
+#### Claude Desktop
 Add to `claude_desktop_config.json`:
 ```json
 {
@@ -403,12 +490,15 @@ Add to `claude_desktop_config.json`:
     "perforce": {
       "command": "mcp-perforce-server",
       "env": {
-        "P4_READONLY_MODE": "false"
+        "P4_READONLY_MODE": "false",
+        "LOG_LEVEL": "error"
       }
     }
   }
 }
 ```
+
+See [MCP_CONFIG_EXAMPLES.md](MCP_CONFIG_EXAMPLES.md) for additional client-specific examples.
 
 ## Environment Variables
 

@@ -13,6 +13,7 @@ export {
   p4Sync,
   p4Opened,
   p4Diff,
+  p4Diff2,
   p4Resolve,
   p4Shelve,
   p4Unshelve,

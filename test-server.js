@@ -64,7 +64,7 @@ async function testComponents() {
     // Test basic tool availability
     const availableTools = [
       'p4Info', 'p4Status', 'p4Add', 'p4Edit', 'p4Delete', 'p4Revert',
-      'p4Sync', 'p4Opened', 'p4Diff', 'p4ChangelistCreate', 'p4ChangelistUpdate',
+      'p4Sync', 'p4Opened', 'p4Diff', 'p4Diff2', 'p4ChangelistCreate', 'p4ChangelistUpdate',
       'p4ChangelistSubmit', 'p4Submit', 'p4Describe', 'p4Filelog', 'p4Clients',
       'p4ConfigDetect'
     ];

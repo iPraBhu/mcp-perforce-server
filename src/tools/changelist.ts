@@ -439,9 +439,9 @@ export async function p4Submit(
  */
 export async function p4Describe(
   context: ToolContext,
-  args: { changelist: string; workspacePath?: string }
+  args: { changelist: string | number; workspacePath?: string }
 ): Promise<P4RunResult> {
-  if (!args.changelist) {
+  if (args.changelist === undefined || args.changelist === null) {
     return {
       ok: false,
       command: 'describe',
@@ -454,35 +454,46 @@ export async function p4Describe(
       },
     };
   }
+
+  const changelist = String(args.changelist).trim();
+  if (!/^\d+$/.test(changelist)) {
+    return {
+      ok: false,
+      command: 'describe',
+      args: [],
+      cwd: process.cwd(),
+      configUsed: {},
+      error: {
+        code: 'P4_INVALID_ARGS',
+        message: 'changelist parameter must be a valid numeric changelist id',
+      },
+    };
+  }
   
   const { cwd, env, configResult } = await context.config.setupForCommand(args.workspacePath);
   
-  const result = await context.runner.run('describe', ['-s', args.changelist], cwd, {
+  const result = await context.runner.run('describe', ['-s', changelist], cwd, {
     env,
-    useZtag: true,
+    useZtag: false,
     parseOutput: false,
   });
   
-  // Defensive programming: ensure result.result is properly handled
-  if (result.ok && result.result !== null && result.result !== undefined) {
-    // Additional safety check to ensure result.result is a string before parsing
-    if (typeof result.result === 'string' && result.result.trim().length > 0) {
-      try {
-        result.result = parse.parseZtagOutput(result.result);
-      } catch (parseError) {
-        // If parsing fails, return raw result with warning
-        result.warnings = result.warnings || [];
-        const errorMessage = parseError instanceof Error ? parseError.message : String(parseError);
-        result.warnings.push(`Parse warning: ${errorMessage}`);
-        // Keep the raw result instead of failing completely
-      }
-    } else {
-      // If result is not a string or is empty, return empty array
-      result.result = [];
+  if (result.ok && typeof result.result === 'string' && result.result.trim().length > 0) {
+    try {
+      result.result = parse.parseDescribeOutput(result.result);
+    } catch (parseError) {
+      result.warnings = result.warnings || [];
+      const errorMessage = parseError instanceof Error ? parseError.message : String(parseError);
+      result.warnings.push(`Parse warning: ${errorMessage}`);
     }
   } else if (result.ok) {
-    // If result.ok is true but result.result is null/undefined, return empty array
-    result.result = [];
+    result.result = {
+      change: parseInt(changelist, 10),
+      description: '',
+      files: [],
+      fileCount: 0,
+      rawText: '',
+    };
   }
   
   result.configUsed = {

@@ -317,6 +317,199 @@ export function parseDiffOutput(output: string | any): ParsedRecord {
 }
 
 /**
+ * Parse p4 diff2 output for depot-to-depot comparisons
+ */
+export function parseDiff2Output(output: string | any, summaryOnly = true): ParsedRecord {
+  const emptyResult: ParsedRecord = {
+    differences: [],
+    totalDifferences: 0,
+    summaryOnly,
+  };
+
+  if (!output || typeof output !== 'string') {
+    return emptyResult;
+  }
+
+  const lines = output
+    .split('\n')
+    .map((line) => stripScriptPrefix(line.replace(/\r$/, '')));
+
+  const differences: ParsedRecord[] = [];
+  let currentDiff: ParsedRecord | null = null;
+  let currentDiffLines: string[] = [];
+
+  const finalizeCurrentDiff = () => {
+    if (!currentDiff) return;
+    if (!summaryOnly) {
+      const diffText = currentDiffLines.join('\n').trim();
+      if (diffText) {
+        currentDiff.diff = diffText;
+      }
+    }
+    differences.push(currentDiff);
+    currentDiff = null;
+    currentDiffLines = [];
+  };
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+
+    if (!trimmed || /^exit:\s*/i.test(trimmed)) {
+      continue;
+    }
+
+    const headerMatch = trimmed.match(/^====\s+(.+?)\s+-\s+(.+?)\s+====(?:\s+(.*))?$/);
+    if (headerMatch) {
+      finalizeCurrentDiff();
+
+      const [, sourceRaw, targetRaw, differenceTypeRaw] = headerMatch;
+      const sourceInfo = parseDiff2Side(sourceRaw);
+      const targetInfo = parseDiff2Side(targetRaw);
+
+      currentDiff = {
+        sourceFile: sourceInfo.depotFile,
+        sourceRevision: sourceInfo.revision,
+        sourceType: sourceInfo.type,
+        targetFile: targetInfo.depotFile,
+        targetRevision: targetInfo.revision,
+        targetType: targetInfo.type,
+        differenceType: differenceTypeRaw ? differenceTypeRaw.trim() : 'content',
+      };
+      continue;
+    }
+
+    if (summaryOnly) {
+      const pairMatch = trimmed.match(/^(.+?#\S+(?:\s+\(.+?\))?)\s+-\s+(.+?#\S+(?:\s+\(.+?\))?)(?:\s+(.*))?$/);
+      if (pairMatch) {
+        finalizeCurrentDiff();
+
+        const [, sourceRaw, targetRaw, differenceTypeRaw] = pairMatch;
+        const sourceInfo = parseDiff2Side(sourceRaw);
+        const targetInfo = parseDiff2Side(targetRaw);
+
+        differences.push({
+          sourceFile: sourceInfo.depotFile,
+          sourceRevision: sourceInfo.revision,
+          sourceType: sourceInfo.type,
+          targetFile: targetInfo.depotFile,
+          targetRevision: targetInfo.revision,
+          targetType: targetInfo.type,
+          differenceType: differenceTypeRaw ? differenceTypeRaw.trim() : 'different',
+        });
+      }
+      continue;
+    }
+
+    if (!summaryOnly && currentDiff) {
+      currentDiffLines.push(line);
+    }
+  }
+
+  finalizeCurrentDiff();
+
+  return {
+    differences: differences as ParsedRecord[],
+    totalDifferences: differences.length,
+    summaryOnly,
+  } as ParsedRecord;
+}
+
+/**
+ * Parse p4 describe -s output into structured changelist data
+ */
+export function parseDescribeOutput(output: string | any): ParsedRecord {
+  const result: ParsedRecord = {
+    files: [],
+    description: '',
+    rawText: '',
+  };
+
+  if (!output || typeof output !== 'string') {
+    return result;
+  }
+
+  const lines = output
+    .split('\n')
+    .map((line) => stripScriptPrefix(line.replace(/\r$/, '')));
+
+  result.rawText = lines
+    .filter((line) => line.trim() && !/^exit:\s*/i.test(line.trim()))
+    .join('\n');
+
+  let inDescription = false;
+  let inFiles = false;
+  const descriptionLines: string[] = [];
+  const files: ParsedRecord[] = [];
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+
+    if (!trimmed || /^exit:\s*/i.test(trimmed)) {
+      if (inDescription && !inFiles && descriptionLines.length > 0 && descriptionLines[descriptionLines.length - 1] !== '') {
+        descriptionLines.push('');
+      }
+      continue;
+    }
+
+    const headerMatch = trimmed.match(
+      /^Change\s+(\d+)\s+by\s+(.+?)@(\S+)\s+on\s+(.+?)(?:\s+\*(\w+)\*)?$/
+    );
+    if (headerMatch) {
+      const [, change, user, client, date, status] = headerMatch;
+      result.change = parseInt(change, 10);
+      result.user = user;
+      result.client = client;
+      result.date = date.trim();
+      result.status = status ? status.toLowerCase() : 'submitted';
+      inDescription = true;
+      inFiles = false;
+      continue;
+    }
+
+    if (/^Affected files\s+\.\.\.$/i.test(trimmed)) {
+      inDescription = false;
+      inFiles = true;
+      continue;
+    }
+
+    if (/^Differences\s+\.\.\.$/i.test(trimmed)) {
+      inDescription = false;
+      inFiles = false;
+      continue;
+    }
+
+    if (inFiles && trimmed.startsWith('... ')) {
+      const fileMatch = trimmed.match(/^\.{3}\s+(.+?)#([^\s]+)\s+([^\s]+)(?:\s+\((.+?)\))?$/);
+      if (fileMatch) {
+        const [, depotFile, revisionRaw, action, type] = fileMatch;
+        const numericRevision = parseInt(revisionRaw, 10);
+        files.push({
+          depotFile,
+          revision: Number.isNaN(numericRevision) ? revisionRaw : numericRevision,
+          action,
+          type: type || undefined,
+        });
+      }
+      continue;
+    }
+
+    if (inDescription) {
+      descriptionLines.push(trimmed);
+    }
+  }
+
+  while (descriptionLines.length > 0 && descriptionLines[descriptionLines.length - 1] === '') {
+    descriptionLines.pop();
+  }
+
+  result.description = descriptionLines.join('\n');
+  result.files = files;
+  result.fileCount = files.length;
+
+  return result;
+}
+
+/**
  * Parse p4 sync output into sync records
  */
 export function parseSyncOutput(output: string | any): ParsedRecord[] {
@@ -931,6 +1124,42 @@ function getResolveAction(status: string): string {
     case 'A': return 'already_resolved';
     default: return 'unknown';
   }
+}
+
+/**
+ * Strip p4 -s script mode prefixes (info1:, error:, exit:, etc.) from output lines
+ */
+function stripScriptPrefix(line: string): string {
+  const match = line.match(/^(info\d*|text|warning|error|exit):\s?(.*)$/i);
+  if (!match) {
+    return line;
+  }
+
+  const [, prefix, value] = match;
+  if (prefix.toLowerCase() === 'exit') {
+    return '';
+  }
+
+  return value;
+}
+
+/**
+ * Parse a single side of a diff2 header line
+ */
+function parseDiff2Side(side: string): { depotFile: string; revision: string | number; type?: string } {
+  const match = side.trim().match(/^(.+?)#([^\s]+)(?:\s+\((.+?)\))?$/);
+  if (!match) {
+    return { depotFile: side.trim(), revision: 'unknown' };
+  }
+
+  const [, depotFile, revisionRaw, type] = match;
+  const numericRevision = parseInt(revisionRaw, 10);
+
+  return {
+    depotFile,
+    revision: Number.isNaN(numericRevision) ? revisionRaw : numericRevision,
+    type: type || undefined,
+  };
 }
 
 /**

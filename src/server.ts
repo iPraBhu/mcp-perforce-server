@@ -258,7 +258,7 @@ class MCPPerforceServer {
           },
           {
             name: 'p4.diff',
-            description: 'Show differences for files',
+            description: 'Show differences for workspace files (opened or local vs depot)',
             inputSchema: {
               type: 'object',
               properties: {
@@ -276,6 +276,33 @@ class MCPPerforceServer {
                   description: 'Path to workspace directory (optional, defaults to current directory)',
                 },
               },
+              additionalProperties: false,
+            },
+          },
+          {
+            name: 'p4.diff2',
+            description: 'Compare two depot paths server-side (depot-to-depot diff, no client mapping required)',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                sourcePath: {
+                  type: 'string',
+                  description: 'First depot filespec/path to compare (required)',
+                },
+                targetPath: {
+                  type: 'string',
+                  description: 'Second depot filespec/path to compare (required)',
+                },
+                summaryOnly: {
+                  type: 'boolean',
+                  description: 'If true, list differing files only like diff2 -q (default: true). If false, include full diff output.',
+                },
+                workspacePath: {
+                  type: 'string',
+                  description: 'Path to workspace directory for config detection (optional, defaults to current directory)',
+                },
+              },
+              required: ['sourcePath', 'targetPath'],
               additionalProperties: false,
             },
           },
@@ -376,12 +403,15 @@ class MCPPerforceServer {
           },
           {
             name: 'p4.describe',
-            description: 'Describe a changelist',
+            description: 'Describe a changelist with metadata and affected files (equivalent to p4 describe -s)',
             inputSchema: {
               type: 'object',
               properties: {
                 changelist: {
-                  type: 'string',
+                  oneOf: [
+                    { type: 'string' },
+                    { type: 'number' },
+                  ],
                   description: 'Changelist number (required)',
                 },
                 workspacePath: {
@@ -1050,6 +1080,8 @@ class MCPPerforceServer {
             return { content: [{ type: 'text', text: JSON.stringify(await tools.p4Opened(this.context, args as any), null, 2) }] };
           case 'p4.diff':
             return { content: [{ type: 'text', text: JSON.stringify(await tools.p4Diff(this.context, args as any), null, 2) }] };
+          case 'p4.diff2':
+            return { content: [{ type: 'text', text: JSON.stringify(await tools.p4Diff2(this.context, args as any), null, 2) }] };
           case 'p4.changelist.create':
             return { content: [{ type: 'text', text: JSON.stringify(await tools.p4ChangelistCreate(this.context, args as any), null, 2) }] };
           case 'p4.changelist.update':

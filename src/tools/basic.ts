@@ -555,6 +555,123 @@ export async function p4Diff(
 }
 
 /**
+ * p4 diff2 - Compare two depot paths server-side (no workspace mapping required)
+ */
+export async function p4Diff2(
+  context: ToolContext,
+  args: {
+    sourcePath: string;
+    targetPath: string;
+    summaryOnly?: boolean;
+    workspacePath?: string;
+  }
+): Promise<P4RunResult> {
+  if (!args.sourcePath || typeof args.sourcePath !== 'string') {
+    return {
+      ok: false,
+      command: 'diff2',
+      args: [],
+      cwd: process.cwd(),
+      configUsed: {},
+      error: {
+        code: 'P4_INVALID_ARGS',
+        message: 'sourcePath parameter is required and must be a string',
+      },
+    };
+  }
+
+  if (!args.targetPath || typeof args.targetPath !== 'string') {
+    return {
+      ok: false,
+      command: 'diff2',
+      args: [],
+      cwd: process.cwd(),
+      configUsed: {},
+      error: {
+        code: 'P4_INVALID_ARGS',
+        message: 'targetPath parameter is required and must be a string',
+      },
+    };
+  }
+
+  const workspaceValidation = validateWorkspacePath(args.workspacePath);
+  if (!workspaceValidation.valid) {
+    return {
+      ok: false,
+      command: 'diff2',
+      args: [],
+      cwd: process.cwd(),
+      configUsed: {},
+      error: {
+        code: 'P4_INVALID_ARGS',
+        message: `Invalid workspacePath: ${workspaceValidation.error}`,
+      },
+    };
+  }
+
+  const sourceSanitization = context.security.sanitizeInput(args.sourcePath, 'filespec');
+  if (!sourceSanitization.valid) {
+    return {
+      ok: false,
+      command: 'diff2',
+      args: [],
+      cwd: process.cwd(),
+      configUsed: {},
+      error: {
+        code: 'P4_INVALID_ARGS',
+        message: `Invalid sourcePath: ${sourceSanitization.warnings.join(', ')}`,
+      },
+    };
+  }
+
+  const targetSanitization = context.security.sanitizeInput(args.targetPath, 'filespec');
+  if (!targetSanitization.valid) {
+    return {
+      ok: false,
+      command: 'diff2',
+      args: [],
+      cwd: process.cwd(),
+      configUsed: {},
+      error: {
+        code: 'P4_INVALID_ARGS',
+        message: `Invalid targetPath: ${targetSanitization.warnings.join(', ')}`,
+      },
+    };
+  }
+
+  const summaryOnly = args.summaryOnly !== false;
+  const { cwd, env, configResult } = await context.config.setupForCommand(args.workspacePath);
+
+  const cmdArgs: string[] = [];
+  if (summaryOnly) {
+    cmdArgs.push('-q');
+  }
+  cmdArgs.push(sourceSanitization.sanitized, targetSanitization.sanitized);
+
+  const result = await context.runner.run('diff2', cmdArgs, cwd, {
+    env,
+    useZtag: false,
+    parseOutput: false,
+  });
+
+  if (result.ok) {
+    const parsed = parse.parseDiff2Output(result.result, summaryOnly);
+    result.result = {
+      sourcePath: sourceSanitization.sanitized,
+      targetPath: targetSanitization.sanitized,
+      ...parsed,
+    };
+  }
+
+  result.configUsed = {
+    ...result.configUsed,
+    p4configPath: configResult.configPath,
+  };
+
+  return result;
+}
+
+/**
  * p4 resolve - Resolve merge conflicts
  */
 export async function p4Resolve(
