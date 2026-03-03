@@ -35,9 +35,131 @@ interface ToolContext {
   security: SecurityManager;
 }
 
+type ToolHandler = (context: ToolContext, args: Record<string, unknown>) => Promise<unknown>;
+
+const TOOL_HANDLERS: Record<string, ToolHandler> = {
+  'p4.info': tools.p4Info as ToolHandler,
+  'p4.status': tools.p4Status as ToolHandler,
+  'p4.add': tools.p4Add as ToolHandler,
+  'p4.edit': tools.p4Edit as ToolHandler,
+  'p4.delete': tools.p4Delete as ToolHandler,
+  'p4.revert': tools.p4Revert as ToolHandler,
+  'p4.sync': tools.p4Sync as ToolHandler,
+  'p4.opened': tools.p4Opened as ToolHandler,
+  'p4.diff': tools.p4Diff as ToolHandler,
+  'p4.diff2': tools.p4Diff2 as ToolHandler,
+  'p4.changelist.create': tools.p4ChangelistCreate as ToolHandler,
+  'p4.changelist.update': tools.p4ChangelistUpdate as ToolHandler,
+  'p4.changelist.submit': tools.p4ChangelistSubmit as ToolHandler,
+  'p4.submit': tools.p4Submit as ToolHandler,
+  'p4.describe': tools.p4Describe as ToolHandler,
+  'p4.filelog': tools.p4Filelog as ToolHandler,
+  'p4.clients': tools.p4Clients as ToolHandler,
+  'p4.config.detect': tools.p4ConfigDetect as ToolHandler,
+  'p4.resolve': tools.p4Resolve as ToolHandler,
+  'p4.shelve': tools.p4Shelve as ToolHandler,
+  'p4.unshelve': tools.p4Unshelve as ToolHandler,
+  'p4.changes': tools.p4Changes as ToolHandler,
+  'p4.blame': tools.p4Blame as ToolHandler,
+  'p4.copy': tools.p4Copy as ToolHandler,
+  'p4.move': tools.p4Move as ToolHandler,
+  'p4.integrate': tools.p4Integrate as ToolHandler,
+  'p4.merge': tools.p4Merge as ToolHandler,
+  'p4.print': tools.p4Print as ToolHandler,
+  'p4.fstat': tools.p4Fstat as ToolHandler,
+  'p4.streams': tools.p4Streams as ToolHandler,
+  'p4.stream': tools.p4Stream as ToolHandler,
+  'p4.grep': tools.p4Grep as ToolHandler,
+  'p4.files': tools.p4Files as ToolHandler,
+  'p4.dirs': tools.p4Dirs as ToolHandler,
+  'p4.users': tools.p4Users as ToolHandler,
+  'p4.user': tools.p4User as ToolHandler,
+  'p4.client': tools.p4Client as ToolHandler,
+  'p4.jobs': tools.p4Jobs as ToolHandler,
+  'p4.job': tools.p4Job as ToolHandler,
+  'p4.fixes': tools.p4Fixes as ToolHandler,
+  'p4.labels': tools.p4Labels as ToolHandler,
+  'p4.label': tools.p4Label as ToolHandler,
+  'p4.sizes': tools.p4Sizes as ToolHandler,
+  'p4.have': tools.p4Have as ToolHandler,
+  'p4.where': tools.p4Where as ToolHandler,
+  'p4.audit': tools.p4Audit as ToolHandler,
+  'p4.compliance': tools.p4Compliance as ToolHandler,
+};
+
+const WRITE_TOOLS = new Set<string>([
+  'p4.add',
+  'p4.edit',
+  'p4.delete',
+  'p4.revert',
+  'p4.sync',
+  'p4.changelist.create',
+  'p4.changelist.update',
+  'p4.changelist.submit',
+  'p4.submit',
+  'p4.resolve',
+  'p4.shelve',
+  'p4.unshelve',
+  'p4.copy',
+  'p4.move',
+  'p4.integrate',
+  'p4.merge',
+]);
+
+const CACHEABLE_TOOLS = new Set<string>(
+  Object.keys(TOOL_HANDLERS).filter((toolName) => !WRITE_TOOLS.has(toolName))
+);
+
+function getPerformanceMode(): 'fast' | 'balanced' | 'secure' {
+  const mode = (process.env.P4_PERFORMANCE_MODE || 'fast').toLowerCase();
+  if (mode === 'balanced' || mode === 'secure') {
+    return mode;
+  }
+  return 'fast';
+}
+
+function getDefaultResponseCacheTtlMs(): number {
+  switch (getPerformanceMode()) {
+    case 'secure':
+      return 1000;
+    case 'balanced':
+      return 3000;
+    case 'fast':
+    default:
+      return 5000;
+  }
+}
+
+function getDefaultResponseCacheMaxEntries(): number {
+  switch (getPerformanceMode()) {
+    case 'secure':
+      return 100;
+    case 'balanced':
+      return 250;
+    case 'fast':
+    default:
+      return 400;
+  }
+}
+
+function getEnvInt(name: string, fallback: number): number {
+  const parsed = parseInt(process.env[name] || '', 10);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
+}
+
 class MCPPerforceServer {
   private server: Server;
   private context: ToolContext;
+  private readonly prettyJson = process.env.P4_PRETTY_JSON === 'true';
+  private readonly responseCacheEnabled = process.env.P4_RESPONSE_CACHE !== 'false';
+  private readonly responseCacheTtlMs = getEnvInt('P4_RESPONSE_CACHE_TTL_MS', getDefaultResponseCacheTtlMs());
+  private readonly responseCacheMaxEntries = getEnvInt(
+    'P4_RESPONSE_CACHE_MAX_ENTRIES',
+    getDefaultResponseCacheMaxEntries()
+  );
+  private readonly responseCache = new Map<string, { value: unknown; expiresAt: number }>();
+  private readonly inFlightReadRequests = new Map<string, Promise<unknown>>();
+  private cacheEpoch = 0;
 
   constructor() {
     this.server = new Server(
@@ -79,6 +201,107 @@ class MCPPerforceServer {
       await this.server.close();
       process.exit(0);
     });
+  }
+
+  private serializeResult(value: unknown): string {
+    if (this.prettyJson) {
+      return JSON.stringify(value, null, 2);
+    }
+    return JSON.stringify(value);
+  }
+
+  private toTextResponse(value: unknown): { content: Array<{ type: 'text'; text: string }> } {
+    return {
+      content: [{ type: 'text', text: this.serializeResult(value) }],
+    };
+  }
+
+  private getCachedResult(cacheKey: string): unknown | undefined {
+    const entry = this.responseCache.get(cacheKey);
+    if (!entry) {
+      return undefined;
+    }
+
+    if (Date.now() > entry.expiresAt) {
+      this.responseCache.delete(cacheKey);
+      return undefined;
+    }
+
+    return entry.value;
+  }
+
+  private setCachedResult(cacheKey: string, value: unknown): void {
+    if (this.responseCacheMaxEntries <= 0 || this.responseCacheTtlMs <= 0) {
+      return;
+    }
+
+    if (this.responseCache.size >= this.responseCacheMaxEntries) {
+      const oldestKey = this.responseCache.keys().next().value;
+      if (oldestKey) {
+        this.responseCache.delete(oldestKey);
+      }
+    }
+
+    this.responseCache.set(cacheKey, {
+      value,
+      expiresAt: Date.now() + this.responseCacheTtlMs,
+    });
+  }
+
+  private clearReadCache(): void {
+    this.cacheEpoch += 1;
+    if (this.responseCache.size > 0) {
+      this.responseCache.clear();
+    }
+  }
+
+  private buildCacheKey(name: string, args: unknown): string {
+    return `${name}:${JSON.stringify(args ?? {})}`;
+  }
+
+  private async executeTool(name: string, args: Record<string, unknown>): Promise<unknown> {
+    const handler = TOOL_HANDLERS[name];
+    if (!handler) {
+      throw new McpError(ErrorCode.MethodNotFound, `Unknown tool: ${name}`);
+    }
+
+    return handler(this.context, args);
+  }
+
+  private async executeToolWithCaching(name: string, args: Record<string, unknown>): Promise<unknown> {
+    if (!this.responseCacheEnabled || !CACHEABLE_TOOLS.has(name)) {
+      return this.executeTool(name, args);
+    }
+
+    const cacheKey = this.buildCacheKey(name, args);
+    const cachedResult = this.getCachedResult(cacheKey);
+    if (cachedResult !== undefined) {
+      return cachedResult;
+    }
+
+    const inFlight = this.inFlightReadRequests.get(cacheKey);
+    if (inFlight) {
+      return inFlight;
+    }
+
+    const pending = this.executeTool(name, args);
+    this.inFlightReadRequests.set(cacheKey, pending);
+    const startedEpoch = this.cacheEpoch;
+
+    try {
+      const result = await pending;
+      if (
+        startedEpoch === this.cacheEpoch &&
+        result &&
+        typeof result === 'object' &&
+        (result as { ok?: boolean }).ok === true
+      ) {
+        this.setCachedResult(cacheKey, result);
+      }
+      return result;
+    } finally {
+      this.inFlightReadRequests.delete(cacheKey);
+    }
   }
 
   private setupToolHandlers(): void {
@@ -1200,123 +1423,25 @@ class MCPPerforceServer {
           }
         }
 
-        // Route to appropriate tool implementation
-        let result: any;
-        switch (name) {
-          case 'p4.info':
-            return { content: [{ type: 'text', text: JSON.stringify(await tools.p4Info(this.context, args as any), null, 2) }] };
-          case 'p4.status':
-            return { content: [{ type: 'text', text: JSON.stringify(await tools.p4Status(this.context, args as any), null, 2) }] };
-          case 'p4.add':
-            return { content: [{ type: 'text', text: JSON.stringify(await tools.p4Add(this.context, args as any), null, 2) }] };
-          case 'p4.edit':
-            return { content: [{ type: 'text', text: JSON.stringify(await tools.p4Edit(this.context, args as any), null, 2) }] };
-          case 'p4.delete':
-            return { content: [{ type: 'text', text: JSON.stringify(await tools.p4Delete(this.context, args as any), null, 2) }] };
-          case 'p4.revert':
-            return { content: [{ type: 'text', text: JSON.stringify(await tools.p4Revert(this.context, args as any), null, 2) }] };
-          case 'p4.sync':
-            return { content: [{ type: 'text', text: JSON.stringify(await tools.p4Sync(this.context, args as any), null, 2) }] };
-          case 'p4.opened':
-            return { content: [{ type: 'text', text: JSON.stringify(await tools.p4Opened(this.context, args as any), null, 2) }] };
-          case 'p4.diff':
-            return { content: [{ type: 'text', text: JSON.stringify(await tools.p4Diff(this.context, args as any), null, 2) }] };
-          case 'p4.diff2':
-            return { content: [{ type: 'text', text: JSON.stringify(await tools.p4Diff2(this.context, args as any), null, 2) }] };
-          case 'p4.changelist.create':
-            return { content: [{ type: 'text', text: JSON.stringify(await tools.p4ChangelistCreate(this.context, args as any), null, 2) }] };
-          case 'p4.changelist.update':
-            return { content: [{ type: 'text', text: JSON.stringify(await tools.p4ChangelistUpdate(this.context, args as any), null, 2) }] };
-          case 'p4.changelist.submit':
-            return { content: [{ type: 'text', text: JSON.stringify(await tools.p4ChangelistSubmit(this.context, args as any), null, 2) }] };
-          case 'p4.submit':
-            return { content: [{ type: 'text', text: JSON.stringify(await tools.p4Submit(this.context, args as any), null, 2) }] };
-          case 'p4.describe':
-            return { content: [{ type: 'text', text: JSON.stringify(await tools.p4Describe(this.context, args as any), null, 2) }] };
-          case 'p4.filelog':
-            return { content: [{ type: 'text', text: JSON.stringify(await tools.p4Filelog(this.context, args as any), null, 2) }] };
-          case 'p4.clients':
-            return { content: [{ type: 'text', text: JSON.stringify(await tools.p4Clients(this.context, args as any), null, 2) }] };
-          case 'p4.config.detect':
-            return { content: [{ type: 'text', text: JSON.stringify(await tools.p4ConfigDetect(this.context, args as any), null, 2) }] };
-          // High Priority Tools
-          case 'p4.resolve':
-            return { content: [{ type: 'text', text: JSON.stringify(await tools.p4Resolve(this.context, args as any), null, 2) }] };
-          case 'p4.shelve':
-            return { content: [{ type: 'text', text: JSON.stringify(await tools.p4Shelve(this.context, args as any), null, 2) }] };
-          case 'p4.unshelve':
-            return { content: [{ type: 'text', text: JSON.stringify(await tools.p4Unshelve(this.context, args as any), null, 2) }] };
-          case 'p4.changes':
-            return { content: [{ type: 'text', text: JSON.stringify(await tools.p4Changes(this.context, args as any), null, 2) }] };
-          case 'p4.blame':
-            return { content: [{ type: 'text', text: JSON.stringify(await tools.p4Blame(this.context, args as any), null, 2) }] };
-          // Medium Priority Tools
-          case 'p4.copy':
-            return { content: [{ type: 'text', text: JSON.stringify(await tools.p4Copy(this.context, args as any), null, 2) }] };
-          case 'p4.move':
-            return { content: [{ type: 'text', text: JSON.stringify(await tools.p4Move(this.context, args as any), null, 2) }] };
-          case 'p4.integrate':
-            return { content: [{ type: 'text', text: JSON.stringify(await tools.p4Integrate(this.context, args as any), null, 2) }] };
-          case 'p4.merge':
-            return { content: [{ type: 'text', text: JSON.stringify(await tools.p4Merge(this.context, args as any), null, 2) }] };
-          case 'p4.print':
-            return { content: [{ type: 'text', text: JSON.stringify(await tools.p4Print(this.context, args as any), null, 2) }] };
-          case 'p4.fstat':
-            return { content: [{ type: 'text', text: JSON.stringify(await tools.p4Fstat(this.context, args as any), null, 2) }] };
-          case 'p4.streams':
-            return { content: [{ type: 'text', text: JSON.stringify(await tools.p4Streams(this.context, args as any), null, 2) }] };
-          case 'p4.stream':
-            return { content: [{ type: 'text', text: JSON.stringify(await tools.p4Stream(this.context, args as any), null, 2) }] };
-          case 'p4.grep':
-            return { content: [{ type: 'text', text: JSON.stringify(await tools.p4Grep(this.context, args as any), null, 2) }] };
-          case 'p4.files':
-            return { content: [{ type: 'text', text: JSON.stringify(await tools.p4Files(this.context, args as any), null, 2) }] };
-          case 'p4.dirs':
-            return { content: [{ type: 'text', text: JSON.stringify(await tools.p4Dirs(this.context, args as any), null, 2) }] };
-          // Advanced/Low Priority Tools
-          case 'p4.users':
-            return { content: [{ type: 'text', text: JSON.stringify(await tools.p4Users(this.context, args as any), null, 2) }] };
-          case 'p4.user':
-            return { content: [{ type: 'text', text: JSON.stringify(await tools.p4User(this.context, args as any), null, 2) }] };
-          case 'p4.client':
-            return { content: [{ type: 'text', text: JSON.stringify(await tools.p4Client(this.context, args as any), null, 2) }] };
-          case 'p4.jobs':
-            return { content: [{ type: 'text', text: JSON.stringify(await tools.p4Jobs(this.context, args as any), null, 2) }] };
-          case 'p4.job':
-            return { content: [{ type: 'text', text: JSON.stringify(await tools.p4Job(this.context, args as any), null, 2) }] };
-          case 'p4.fixes':
-            return { content: [{ type: 'text', text: JSON.stringify(await tools.p4Fixes(this.context, args as any), null, 2) }] };
-          case 'p4.labels':
-            return { content: [{ type: 'text', text: JSON.stringify(await tools.p4Labels(this.context, args as any), null, 2) }] };
-          case 'p4.label':
-            return { content: [{ type: 'text', text: JSON.stringify(await tools.p4Label(this.context, args as any), null, 2) }] };
-          case 'p4.sizes':
-            return { content: [{ type: 'text', text: JSON.stringify(await tools.p4Sizes(this.context, args as any), null, 2) }] };
-          case 'p4.have':
-            return { content: [{ type: 'text', text: JSON.stringify(await tools.p4Have(this.context, args as any), null, 2) }] };
-          case 'p4.where':
-            return { content: [{ type: 'text', text: JSON.stringify(await tools.p4Where(this.context, args as any), null, 2) }] };
-          // Compliance and Security Tools
-          case 'p4.audit':
-            return { content: [{ type: 'text', text: JSON.stringify(await tools.p4Audit(this.context, args as any), null, 2) }] };
-          case 'p4.compliance':
-            return { content: [{ type: 'text', text: JSON.stringify(await tools.p4Compliance(this.context, args as any), null, 2) }] };
-          default:
-            throw new McpError(ErrorCode.MethodNotFound, `Unknown tool: ${name}`);
+        const toolArgs = (args || {}) as Record<string, unknown>;
+        const result = await this.executeToolWithCaching(name, toolArgs);
+
+        if (WRITE_TOOLS.has(name) && result && typeof result === 'object' && (result as { ok?: boolean }).ok) {
+          this.clearReadCache();
         }
 
         // Audit log successful operation
         this.context.security.logAuditEntry({
           tool: name,
-          user: result?.configUsed?.P4USER || 'unknown',
-          client: result?.configUsed?.P4CLIENT || 'unknown',
+          user: (result as { configUsed?: { P4USER?: string } } | undefined)?.configUsed?.P4USER || 'unknown',
+          client: (result as { configUsed?: { P4CLIENT?: string } } | undefined)?.configUsed?.P4CLIENT || 'unknown',
           operation: name,
-          args: args || {},
+          args: toolArgs,
           result: 'success',
           duration: Date.now() - startTime,
         });
 
-        return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+        return this.toTextResponse(result);
 
       } catch (error) {
         const duration = Date.now() - startTime;
@@ -1381,11 +1506,17 @@ Environment Variables:
   P4_PATH=/path/to/p4         Custom p4 executable path
   P4CONFIG=.p4config         Config file name (default: .p4config)
   LOG_LEVEL=info             Logging level: error,warn,info,debug
+  P4_PERFORMANCE_MODE=fast    Performance profile: fast|balanced|secure (default: fast)
+  P4_TIMEOUT_MS=5000          Command timeout in milliseconds (default by mode)
+  P4_PRETTY_JSON=true         Pretty-print JSON responses (default: compact JSON)
+  P4_RESPONSE_CACHE=false     Disable read-result cache (default: enabled)
+  P4_RESPONSE_CACHE_TTL_MS=5000 Cache TTL in ms (default by mode: fast 5000, balanced 3000, secure 1000)
+  P4_RESPONSE_CACHE_MAX_ENTRIES=400 Max cached responses (default by mode)
 
 Compliance & Security:
-  P4_ENABLE_AUDIT_LOGGING=true   Enable audit logging (default: disabled)
-  P4_ENABLE_RATE_LIMITING=false  Disable rate limiting (default: enabled)
-  P4_ENABLE_MEMORY_LIMITS=false  Disable memory limits (default: enabled)
+  P4_ENABLE_AUDIT_LOGGING=true|false   Override audit logging (default in fast mode: false)
+  P4_ENABLE_RATE_LIMITING=true|false   Override rate limiting (default in fast mode: false)
+  P4_ENABLE_MEMORY_LIMITS=true|false   Override memory limits (default in fast mode: false)
   P4_ENABLE_INPUT_SANITIZATION=false Disable input sanitization (default: enabled)
   P4_MAX_MEMORY_MB=1024         Memory limit in MB (default: 512)
   P4_AUDIT_RETENTION_DAYS=365   Audit log retention days (default: 90)

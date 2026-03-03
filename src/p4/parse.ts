@@ -17,7 +17,7 @@ export function parseZtagOutput(output: string | any): ParsedRecord[] {
     return results;
   }
   
-  const lines = normalizeScriptOutput(output).split('\n');
+  const lines = getNormalizedLines(output);
   let currentRecord: ParsedRecord = {};
   
   for (const line of lines) {
@@ -59,7 +59,7 @@ export function parseInfoOutput(output: string | any): ParsedRecord {
     return result;
   }
   
-  const lines = normalizeScriptOutput(output).split('\n');
+  const lines = getNormalizedLines(output);
   
   for (const line of lines) {
     const trimmedLine = line.trim();
@@ -90,7 +90,7 @@ export function parseOpenedOutput(output: string | any): ParsedRecord[] {
     return results;
   }
   
-  const lines = normalizeScriptOutput(output).split('\n').filter(line => line.trim());
+  const lines = getNormalizedLines(output, { removeEmpty: true });
   
   for (const line of lines) {
     // Format: "//depot/path#revision - action by user@client (change) type"
@@ -132,7 +132,7 @@ export function parseChangesOutput(output: string | any): ParsedRecord[] {
     return results;
   }
   
-  const lines = normalizeScriptOutput(output).split('\n').filter(line => line.trim()).map(line => line.trim());
+  const lines = getNormalizedLines(output, { trim: true, removeEmpty: true });
   
   for (const line of lines) {
     // Remove "info: " prefix if present (from -s flag output)
@@ -166,7 +166,7 @@ export function parseFilelogOutput(output: string | any): ParsedRecord[] {
     return results;
   }
   
-  const lines = normalizeScriptOutput(output).split('\n');
+  const lines = getNormalizedLines(output);
   let currentFile: ParsedRecord | null = null;
   let currentRevision: ParsedRecord | null = null;
   
@@ -225,7 +225,7 @@ export function parseClientsOutput(output: string | any): ParsedRecord[] {
     return results;
   }
   
-  const lines = normalizeScriptOutput(output).split('\n').filter(line => line.trim());
+  const lines = getNormalizedLines(output, { removeEmpty: true });
   
   for (const line of lines) {
     // Format: "Client clientname 2023/01/01 root /path/to/root 'Description...'"
@@ -258,7 +258,7 @@ export function parseDiffOutput(output: string | any): ParsedRecord {
     } as ParsedRecord;
   }
   
-  const lines = normalizeScriptOutput(output).split('\n');
+  const lines = getNormalizedLines(output);
   const files: ParsedRecord[] = [];
   let currentFile: ParsedRecord | null = null;
   let diffLines: string[] = [];
@@ -330,9 +330,7 @@ export function parseDiff2Output(output: string | any, summaryOnly = true): Pars
     return emptyResult;
   }
 
-  const lines = output
-    .split('\n')
-    .map((line) => stripScriptPrefix(line.replace(/\r$/, '')));
+  const lines = getNormalizedLines(output);
 
   const differences: ParsedRecord[] = [];
   let currentDiff: ParsedRecord | null = null;
@@ -354,7 +352,7 @@ export function parseDiff2Output(output: string | any, summaryOnly = true): Pars
   for (const line of lines) {
     const trimmed = line.trim();
 
-    if (!trimmed || /^exit:\s*/i.test(trimmed)) {
+    if (!trimmed) {
       continue;
     }
 
@@ -428,12 +426,10 @@ export function parseDescribeOutput(output: string | any): ParsedRecord {
     return result;
   }
 
-  const lines = output
-    .split('\n')
-    .map((line) => stripScriptPrefix(line.replace(/\r$/, '')));
+  const lines = getNormalizedLines(output);
 
   result.rawText = lines
-    .filter((line) => line.trim() && !/^exit:\s*/i.test(line.trim()))
+    .filter((line) => line.trim())
     .join('\n');
 
   let inDescription = false;
@@ -444,7 +440,7 @@ export function parseDescribeOutput(output: string | any): ParsedRecord {
   for (const line of lines) {
     const trimmed = line.trim();
 
-    if (!trimmed || /^exit:\s*/i.test(trimmed)) {
+    if (!trimmed) {
       if (inDescription && !inFiles && descriptionLines.length > 0 && descriptionLines[descriptionLines.length - 1] !== '') {
         descriptionLines.push('');
       }
@@ -520,7 +516,7 @@ export function parseSyncOutput(output: string | any): ParsedRecord[] {
     return results;
   }
   
-  const lines = normalizeScriptOutput(output).split('\n').filter(line => line.trim());
+  const lines = getNormalizedLines(output, { removeEmpty: true });
   
   for (const line of lines) {
     // Format: "//depot/path#revision - updating /local/path"
@@ -552,7 +548,7 @@ export function parseResolveOutput(output: string | any): ParsedRecord[] {
     return results;
   }
   
-  const lines = normalizeScriptOutput(output).split('\n').filter(line => line.trim());
+  const lines = getNormalizedLines(output, { removeEmpty: true });
   
   for (const line of lines) {
     // Format: "C /path/to/file - merging //depot/path#123"
@@ -582,7 +578,7 @@ export function parseShelveOutput(output: string | any): ParsedRecord[] {
     return results;
   }
   
-  const lines = normalizeScriptOutput(output).split('\n').filter(line => line.trim());
+  const lines = getNormalizedLines(output, { removeEmpty: true });
   
   for (const line of lines) {
     // Format: "change 12345 shelved"
@@ -610,7 +606,7 @@ export function parseUnshelveOutput(output: string | any): ParsedRecord[] {
     return results;
   }
   
-  const lines = normalizeScriptOutput(output).split('\n').filter(line => line.trim());
+  const lines = getNormalizedLines(output, { removeEmpty: true });
   
   for (const line of lines) {
     // Format: "//depot/path#123 - unshelved"
@@ -639,7 +635,7 @@ export function parseBlameOutput(output: string | any): ParsedRecord[] {
     return results;
   }
   
-  const lines = normalizeScriptOutput(output).split('\n').filter(line => line.trim());
+  const lines = getNormalizedLines(output, { removeEmpty: true });
   
   for (const line of lines) {
     // Format: "12345: user 2023/01/01 12:34:56: content"
@@ -670,7 +666,7 @@ export function parseCopyOutput(output: string | any): ParsedRecord[] {
     return results;
   }
   
-  const lines = normalizeScriptOutput(output).split('\n').filter(line => line.trim());
+  const lines = getNormalizedLines(output, { removeEmpty: true });
   
   for (const line of lines) {
     // Format: "//depot/src#123 - copied to //depot/dst#124"
@@ -701,7 +697,7 @@ export function parseMoveOutput(output: string | any): ParsedRecord[] {
     return results;
   }
   
-  const lines = normalizeScriptOutput(output).split('\n').filter(line => line.trim());
+  const lines = getNormalizedLines(output, { removeEmpty: true });
   
   for (const line of lines) {
     // Format: "//depot/old#123 - moved to //depot/new#124"
@@ -732,7 +728,7 @@ export function parseGrepOutput(output: string | any): ParsedRecord[] {
     return results;
   }
   
-  const lines = normalizeScriptOutput(output).split('\n').filter(line => line.trim());
+  const lines = getNormalizedLines(output, { removeEmpty: true });
   
   for (const line of lines) {
     // Format: "//depot/path:123:matched text here"
@@ -761,7 +757,7 @@ export function parseFilesOutput(output: string | any): ParsedRecord[] {
     return results;
   }
   
-  const lines = normalizeScriptOutput(output).split('\n').filter(line => line.trim());
+  const lines = getNormalizedLines(output, { removeEmpty: true });
   
   for (const line of lines) {
     // Format: "//depot/path#123 - action change 456 (type text)"
@@ -792,7 +788,7 @@ export function parseDirsOutput(output: string | any): ParsedRecord[] {
     return results;
   }
   
-  const lines = normalizeScriptOutput(output).split('\n').filter(line => line.trim());
+  const lines = getNormalizedLines(output, { removeEmpty: true });
   
   for (const line of lines) {
     // Directories are listed one per line
@@ -817,7 +813,7 @@ export function parseUsersOutput(output: string | any): ParsedRecord[] {
     return results;
   }
   
-  const lines = normalizeScriptOutput(output).split('\n').filter(line => line.trim());
+  const lines = getNormalizedLines(output, { removeEmpty: true });
   
   for (const line of lines) {
     // Format: "user <user@domain> (realname) accessed 2023/01/01 12:34:56"
@@ -847,7 +843,7 @@ export function parseUserOutput(output: string | any): ParsedRecord {
     return result;
   }
   
-  const lines = normalizeScriptOutput(output).split('\n');
+  const lines = getNormalizedLines(output);
   
   for (const line of lines) {
     const colonIndex = line.indexOf(': ');
@@ -872,7 +868,7 @@ export function parseClientOutput(output: string | any): ParsedRecord {
     return result;
   }
   
-  const lines = normalizeScriptOutput(output).split('\n');
+  const lines = getNormalizedLines(output);
   
   for (const line of lines) {
     const colonIndex = line.indexOf(': ');
@@ -897,7 +893,7 @@ export function parseJobsOutput(output: string | any): ParsedRecord[] {
     return results;
   }
   
-  const lines = normalizeScriptOutput(output).split('\n').filter(line => line.trim());
+  const lines = getNormalizedLines(output, { removeEmpty: true });
   
   for (const line of lines) {
     // Format: "job000001 on 2023/01/01 by user *open* 'Job description'"
@@ -928,7 +924,7 @@ export function parseJobOutput(output: string | any): ParsedRecord {
     return result;
   }
   
-  const lines = normalizeScriptOutput(output).split('\n');
+  const lines = getNormalizedLines(output);
   
   for (const line of lines) {
     const colonIndex = line.indexOf(': ');
@@ -953,7 +949,7 @@ export function parseFixesOutput(output: string | any): ParsedRecord[] {
     return results;
   }
   
-  const lines = normalizeScriptOutput(output).split('\n').filter(line => line.trim());
+  const lines = getNormalizedLines(output, { removeEmpty: true });
   
   for (const line of lines) {
     // Format: "job000001 fixed by change 12345 on 2023/01/01 by user@client"
@@ -983,7 +979,7 @@ export function parseLabelsOutput(output: string | any): ParsedRecord[] {
     return results;
   }
   
-  const lines = normalizeScriptOutput(output).split('\n').filter(line => line.trim());
+  const lines = getNormalizedLines(output, { removeEmpty: true });
   
   for (const line of lines) {
     // Format: "Label labelname 2023/01/01 'Label description'"
@@ -1012,7 +1008,7 @@ export function parseLabelOutput(output: string | any): ParsedRecord {
     return result;
   }
   
-  const lines = normalizeScriptOutput(output).split('\n');
+  const lines = getNormalizedLines(output);
   
   for (const line of lines) {
     const colonIndex = line.indexOf(': ');
@@ -1040,7 +1036,7 @@ export function parseSizesOutput(output: string | any): ParsedRecord {
   }
   
   const result: ParsedRecord = {};
-  const lines = normalizeScriptOutput(output).split('\n').filter(line => line.trim());
+  const lines = getNormalizedLines(output, { removeEmpty: true });
   
   for (const line of lines) {
     if (line.includes('files,')) {
@@ -1067,7 +1063,7 @@ export function parseHaveOutput(output: string | any): ParsedRecord[] {
     return results;
   }
   
-  const lines = normalizeScriptOutput(output).split('\n').filter(line => line.trim());
+  const lines = getNormalizedLines(output, { removeEmpty: true });
   
   for (const line of lines) {
     // Format: "//depot/path#123 - /local/path"
@@ -1096,7 +1092,7 @@ export function parseWhereOutput(output: string | any): ParsedRecord[] {
     return results;
   }
   
-  const lines = normalizeScriptOutput(output).split('\n').filter(line => line.trim());
+  const lines = getNormalizedLines(output, { removeEmpty: true });
   
   for (const line of lines) {
     // Format: "//depot/path /local/path //depot/path"
@@ -1131,7 +1127,7 @@ export function parseStreamsOutput(output: string | any): ParsedRecord[] {
     return results;
   }
 
-  const lines = normalizeScriptOutput(output).split('\n').filter((line) => line.trim());
+  const lines = getNormalizedLines(output, { removeEmpty: true });
   for (const line of lines) {
     // Format: "Stream //Depot/main 2025/01/01 owner 'description'"
     const match = line.match(/^Stream\s+(\S+)\s+(\S+)\s+(\S+)\s+'(.*)'$/);
@@ -1161,7 +1157,7 @@ export function parseStreamOutput(output: string | any): ParsedRecord {
     return result;
   }
 
-  const lines = normalizeScriptOutput(output).split('\n');
+  const lines = getNormalizedLines(output);
   for (const line of lines) {
     const colonIndex = line.indexOf(':');
     if (colonIndex > 0) {
@@ -1185,7 +1181,7 @@ export function parsePrintOutput(output: string | any): ParsedRecord {
   }
 
   return {
-    content: normalizeScriptOutput(output).trim(),
+    content: getNormalizedLines(output).join('\n').trim(),
   };
 }
 
@@ -1199,7 +1195,7 @@ export function parseIntegrateOutput(output: string | any): ParsedRecord[] {
     return results;
   }
 
-  const lines = normalizeScriptOutput(output).split('\n').filter((line) => line.trim());
+  const lines = getNormalizedLines(output, { removeEmpty: true });
   for (const line of lines) {
     // Common formats:
     // //depot/target#5 - integrate from //depot/source#7
@@ -1240,16 +1236,6 @@ function getResolveAction(status: string): string {
 }
 
 /**
- * Normalize p4 script output by removing common prefixes while preserving line structure
- */
-function normalizeScriptOutput(output: string): string {
-  return output
-    .split('\n')
-    .map((line) => stripScriptPrefix(line.replace(/\r$/, '')))
-    .join('\n');
-}
-
-/**
  * Strip p4 -s script mode prefixes (info1:, error:, exit:, etc.) from output lines
  */
 function stripScriptPrefix(line: string): string {
@@ -1264,6 +1250,30 @@ function stripScriptPrefix(line: string): string {
   }
 
   return value;
+}
+
+function getNormalizedLines(
+  output: string | any,
+  options: { trim?: boolean; removeEmpty?: boolean } = {}
+): string[] {
+  if (!output || typeof output !== 'string') {
+    return [];
+  }
+
+  const { trim = false, removeEmpty = false } = options;
+  const lines = output.split('\n');
+  const normalized: string[] = [];
+
+  for (const rawLine of lines) {
+    const stripped = stripScriptPrefix(rawLine.replace(/\r$/, ''));
+    const value = trim ? stripped.trim() : stripped;
+    if (removeEmpty && value.trim().length === 0) {
+      continue;
+    }
+    normalized.push(value);
+  }
+
+  return normalized;
 }
 
 /**
@@ -1308,3 +1318,4 @@ function parseValue(value: string): string | number | boolean {
   
   return value;
 }
+

@@ -100,6 +100,17 @@ async function testComponents() {
       console.error('[TEST] âœ— parseDescribeOutput failed');
     }
 
+    const parsedDiff2 = parse.parseDiff2Output(
+      'info1: ==== //depot/main/file.txt#7 - //depot/release/file.txt#5 ==== content\n' +
+      'exit: 0\n',
+      true
+    );
+    if (parsedDiff2.totalDifferences === 1 && Array.isArray(parsedDiff2.differences)) {
+      console.error('[TEST] Ã¢Å“â€œ parseDiff2Output returns structured depot-to-depot differences');
+    } else {
+      console.error('[TEST] Ã¢Å“â€” parseDiff2Output failed');
+    }
+
     const parsedFstat = parse.parseFstatOutput('... depotFile //depot/main/file.txt\n... headRev 7\n');
     if (Array.isArray(parsedFstat) && parsedFstat.length >= 1) {
       console.error('[TEST] âœ“ parseFstatOutput returns structured metadata');

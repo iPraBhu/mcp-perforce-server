@@ -45,13 +45,22 @@ export class SecurityManager {
   private readonly CLEANUP_INTERVAL = 24 * 60 * 60 * 1000; // Daily cleanup
 
   constructor(config: Partial<ComplianceConfig> = {}) {
-    // Performance-optimized defaults: disable expensive features in development
-    const isDevelopment = process.env.NODE_ENV === 'development' || process.env.P4_PERFORMANCE_MODE === 'fast';
-    
+    const mode = (process.env.P4_PERFORMANCE_MODE || 'fast').toLowerCase();
+    const modeDefaults: Record<string, Pick<ComplianceConfig, 'enableAuditLogging' | 'enableRateLimiting' | 'enableMemoryLimits'>> = {
+      fast: { enableAuditLogging: false, enableRateLimiting: false, enableMemoryLimits: false },
+      balanced: { enableAuditLogging: false, enableRateLimiting: false, enableMemoryLimits: true },
+      secure: { enableAuditLogging: true, enableRateLimiting: true, enableMemoryLimits: true },
+    };
+    const defaults = modeDefaults[mode] || modeDefaults.fast;
+    const getBooleanEnv = (key: string, defaultValue: boolean): boolean => {
+      if (process.env[key] === undefined) return defaultValue;
+      return process.env[key] === 'true';
+    };
+
     this.complianceConfig = {
-      enableAuditLogging: process.env.P4_ENABLE_AUDIT_LOGGING === 'true',
-      enableRateLimiting: isDevelopment ? false : (process.env.P4_ENABLE_RATE_LIMITING !== 'false'),
-      enableMemoryLimits: isDevelopment ? false : (process.env.P4_ENABLE_MEMORY_LIMITS !== 'false'),
+      enableAuditLogging: getBooleanEnv('P4_ENABLE_AUDIT_LOGGING', defaults.enableAuditLogging),
+      enableRateLimiting: getBooleanEnv('P4_ENABLE_RATE_LIMITING', defaults.enableRateLimiting),
+      enableMemoryLimits: getBooleanEnv('P4_ENABLE_MEMORY_LIMITS', defaults.enableMemoryLimits),
       enableInputSanitization: process.env.P4_ENABLE_INPUT_SANITIZATION !== 'false',
       maxMemoryMB: parseInt(process.env.P4_MAX_MEMORY_MB || '512'),
       auditLogRetentionDays: parseInt(process.env.P4_AUDIT_RETENTION_DAYS || '90'),

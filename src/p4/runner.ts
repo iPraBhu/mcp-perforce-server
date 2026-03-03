@@ -2,6 +2,18 @@ import { spawn, SpawnOptions } from 'child_process';
 import * as path from 'path';
 import * as os from 'os';
 
+function getDefaultTimeoutMs(): string {
+  switch ((process.env.P4_PERFORMANCE_MODE || 'fast').toLowerCase()) {
+    case 'secure':
+      return '15000';
+    case 'balanced':
+      return '10000';
+    case 'fast':
+    default:
+      return '5000';
+  }
+}
+
 export interface P4RunResult {
   ok: boolean;
   command: string;
@@ -37,7 +49,7 @@ export interface P4RunOptions {
 }
 
 export class P4Runner {
-  private static readonly DEFAULT_TIMEOUT = parseInt(process.env.P4_TIMEOUT_MS || '10000'); // 10 seconds default, configurable
+  private static readonly DEFAULT_TIMEOUT = parseInt(process.env.P4_TIMEOUT_MS || getDefaultTimeoutMs());
   private readonly p4Path: string;
   private lastMemoryCheck = 0;
   private readonly MEMORY_CHECK_INTERVAL = 30000; // Check memory every 30 seconds max

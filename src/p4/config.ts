@@ -1,6 +1,18 @@
 import * as fs from 'fs';
 import * as path from 'path';
 
+function getDefaultConfigCacheTtl(): string {
+  switch ((process.env.P4_PERFORMANCE_MODE || 'fast').toLowerCase()) {
+    case 'secure':
+      return '300000'; // 5 min
+    case 'balanced':
+      return '300000'; // 5 min
+    case 'fast':
+    default:
+      return '600000'; // 10 min
+  }
+}
+
 export interface P4ConfigResult {
   found: boolean;
   configPath?: string;
@@ -17,7 +29,7 @@ export interface P4ServerConfig {
 export class P4Config {
   private static readonly DEFAULT_CONFIG_NAME = '.p4config';
   private configCache = new Map<string, { result: P4ConfigResult; timestamp: number }>();
-  private readonly CACHE_TTL = parseInt(process.env.P4_CONFIG_CACHE_TTL || '300000'); // 5 minutes default
+  private readonly CACHE_TTL = parseInt(process.env.P4_CONFIG_CACHE_TTL || getDefaultConfigCacheTtl());
   
   /**
    * Find .p4config file by searching upward from the given directory

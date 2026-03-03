@@ -151,24 +151,23 @@ export async function p4Status(
 ): Promise<P4RunResult> {
   const { cwd, env, configResult } = await context.config.setupForCommand(args.workspacePath);
   
-  // Get opened files
-  const openedResult = await context.runner.run('opened', [], cwd, {
+  // Run both read commands in parallel for lower status latency
+  const openedPromise = context.runner.run('opened', [], cwd, {
     env,
     useZtag: false,
     parseOutput: false,
   });
-  
+  const changesPromise = context.runner.run('changes', ['-s', 'pending', '-c', env.P4CLIENT || ''], cwd, {
+    env,
+    useZtag: false,
+    parseOutput: false,
+  });
+  const [openedResult, changesResult] = await Promise.all([openedPromise, changesPromise]);
+
   let openedFiles: any[] = [];
   if (openedResult.ok && openedResult.result) {
     openedFiles = parse.parseOpenedOutput(openedResult.result);
   }
-  
-  // Get pending changes
-  const changesResult = await context.runner.run('changes', ['-s', 'pending', '-c', env.P4CLIENT || ''], cwd, {
-    env,
-    useZtag: false,
-    parseOutput: false,
-  });
   
   let pendingChanges: any[] = [];
   if (changesResult.ok && changesResult.result) {
