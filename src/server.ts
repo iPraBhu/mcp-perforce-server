@@ -677,6 +677,147 @@ class MCPPerforceServer {
             },
           },
           {
+            name: 'p4.integrate',
+            description: 'Integrate files from source to target',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                source: {
+                  type: 'string',
+                  description: 'Source filespec/path (required)',
+                },
+                target: {
+                  type: 'string',
+                  description: 'Target filespec/path (required)',
+                },
+                changelist: {
+                  type: 'string',
+                  description: 'Changelist number (optional)',
+                },
+                workspacePath: {
+                  type: 'string',
+                  description: 'Path to workspace directory (optional, defaults to current directory)',
+                },
+              },
+              required: ['source', 'target'],
+              additionalProperties: false,
+            },
+          },
+          {
+            name: 'p4.merge',
+            description: 'Merge files from source to target',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                source: {
+                  type: 'string',
+                  description: 'Source filespec/path (required)',
+                },
+                target: {
+                  type: 'string',
+                  description: 'Target filespec/path (required)',
+                },
+                changelist: {
+                  type: 'string',
+                  description: 'Changelist number (optional)',
+                },
+                workspacePath: {
+                  type: 'string',
+                  description: 'Path to workspace directory (optional, defaults to current directory)',
+                },
+              },
+              required: ['source', 'target'],
+              additionalProperties: false,
+            },
+          },
+          {
+            name: 'p4.print',
+            description: 'Print file content from the depot',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                filespec: {
+                  type: 'string',
+                  description: 'Depot filespec to print (required)',
+                },
+                quiet: {
+                  type: 'boolean',
+                  description: 'Suppress file headers (optional, defaults to true)',
+                },
+                workspacePath: {
+                  type: 'string',
+                  description: 'Path to workspace directory (optional, defaults to current directory)',
+                },
+              },
+              required: ['filespec'],
+              additionalProperties: false,
+            },
+          },
+          {
+            name: 'p4.fstat',
+            description: 'Get file metadata from depot/workspace',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                filespec: {
+                  type: 'string',
+                  description: 'Filespec to inspect (required)',
+                },
+                max: {
+                  type: 'number',
+                  description: 'Maximum number of results (optional)',
+                },
+                workspacePath: {
+                  type: 'string',
+                  description: 'Path to workspace directory (optional, defaults to current directory)',
+                },
+              },
+              required: ['filespec'],
+              additionalProperties: false,
+            },
+          },
+          {
+            name: 'p4.streams',
+            description: 'List streams',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                stream: {
+                  type: 'string',
+                  description: 'Optional stream path filter',
+                },
+                max: {
+                  type: 'number',
+                  description: 'Maximum number of results (optional)',
+                },
+                workspacePath: {
+                  type: 'string',
+                  description: 'Path to workspace directory (optional, defaults to current directory)',
+                },
+              },
+              additionalProperties: false,
+            },
+          },
+          {
+            name: 'p4.stream',
+            description: 'Get stream spec details',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                stream: {
+                  type: 'string',
+                  description: 'Stream path/name (required)',
+                },
+                workspacePath: {
+                  type: 'string',
+                  description: 'Path to workspace directory (optional, defaults to current directory)',
+                },
+              },
+              required: ['stream'],
+              additionalProperties: false,
+            },
+          },
+          {
             name: 'p4.grep',
             description: 'Search for text patterns across depot files',
             inputSchema: {
@@ -1114,6 +1255,18 @@ class MCPPerforceServer {
             return { content: [{ type: 'text', text: JSON.stringify(await tools.p4Copy(this.context, args as any), null, 2) }] };
           case 'p4.move':
             return { content: [{ type: 'text', text: JSON.stringify(await tools.p4Move(this.context, args as any), null, 2) }] };
+          case 'p4.integrate':
+            return { content: [{ type: 'text', text: JSON.stringify(await tools.p4Integrate(this.context, args as any), null, 2) }] };
+          case 'p4.merge':
+            return { content: [{ type: 'text', text: JSON.stringify(await tools.p4Merge(this.context, args as any), null, 2) }] };
+          case 'p4.print':
+            return { content: [{ type: 'text', text: JSON.stringify(await tools.p4Print(this.context, args as any), null, 2) }] };
+          case 'p4.fstat':
+            return { content: [{ type: 'text', text: JSON.stringify(await tools.p4Fstat(this.context, args as any), null, 2) }] };
+          case 'p4.streams':
+            return { content: [{ type: 'text', text: JSON.stringify(await tools.p4Streams(this.context, args as any), null, 2) }] };
+          case 'p4.stream':
+            return { content: [{ type: 'text', text: JSON.stringify(await tools.p4Stream(this.context, args as any), null, 2) }] };
           case 'p4.grep':
             return { content: [{ type: 'text', text: JSON.stringify(await tools.p4Grep(this.context, args as any), null, 2) }] };
           case 'p4.files':

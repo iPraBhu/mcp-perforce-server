@@ -120,7 +120,7 @@ export class P4Runner {
     };
 
     try {
-      const { stdout, stderr, exitCode } = await this.spawnP4Process(fullArgs, {
+      const { stdout, stdoutBuffer, stderr, exitCode } = await this.spawnP4Process(fullArgs, {
         cwd,
         env: processEnv,
         timeout,
@@ -129,7 +129,17 @@ export class P4Runner {
 
       if (exitCode === 0) {
         result.ok = true;
-        if (parseOutput && stdout && typeof stdout === 'string' && stdout.trim()) {
+        if (parseOutput && useMarshalled && stdoutBuffer.length > 0) {
+          try {
+            result.result = this.parseOutput(stdoutBuffer, useZtag, useMarshalled);
+          } catch (parseError) {
+            // If marshaled parsing fails, return textual fallback with warning
+            result.result = stdout.trim() || null;
+            result.warnings = result.warnings || [];
+            const errorMessage = parseError instanceof Error ? parseError.message : String(parseError);
+            result.warnings.push(`Parse warning: ${errorMessage}`);
+          }
+        } else if (parseOutput && stdout && typeof stdout === 'string' && stdout.trim()) {
           try {
             result.result = this.parseOutput(stdout, useZtag, useMarshalled);
           } catch (parseError) {
@@ -161,7 +171,7 @@ export class P4Runner {
   private async spawnP4Process(
     args: string[],
     options: { cwd: string; env: Record<string, string | undefined>; timeout: number; stdin?: string }
-  ): Promise<{ stdout: string; stderr: string; exitCode: number }> {
+  ): Promise<{ stdout: string; stdoutBuffer: Buffer; stderr: string; exitCode: number }> {
     return new Promise((resolve, reject) => {
       const spawnOptions: SpawnOptions = {
         cwd: options.cwd,
@@ -175,6 +185,7 @@ export class P4Runner {
       const child = spawn(this.p4Path, args, spawnOptions);
       
       let stdout = '';
+      const stdoutChunks: Buffer[] = [];
       let stderr = '';
       let timeoutHandle: NodeJS.Timeout | null = null;
 
@@ -195,6 +206,7 @@ export class P4Runner {
       // Collect output
       child.stdout?.on('data', (data: Buffer) => {
         stdout += data.toString();
+        stdoutChunks.push(data);
       });
 
       child.stderr?.on('data', (data: Buffer) => {
@@ -207,6 +219,7 @@ export class P4Runner {
         }
         resolve({
           stdout: String(stdout || ''),
+          stdoutBuffer: stdoutChunks.length > 0 ? Buffer.concat(stdoutChunks) : Buffer.alloc(0),
           stderr: String(stderr || ''),
           exitCode: code ?? -1,
         });
@@ -221,25 +234,26 @@ export class P4Runner {
     });
   }
 
-  private parseOutput(output: string, useZtag: boolean, useMarshalled: boolean): any {
-    if (!output.trim()) {
+  private parseOutput(output: string | Buffer, useZtag: boolean, useMarshalled: boolean): any {
+    const isBuffer = Buffer.isBuffer(output);
+    const outputText = isBuffer ? output.toString('utf8') : output;
+
+    if (!outputText.trim()) {
       return null;
     }
 
     try {
       if (useMarshalled) {
-        // Parse marshaled output (binary format) - simplified parsing
-        // In practice, you'd use a proper marshaling library
-        return this.parseMarshaled(output);
+        return this.parseMarshaled(isBuffer ? output : Buffer.from(outputText, 'binary'));
       } else if (useZtag) {
-        return this.parseZtagOutput(output);
+        return this.parseZtagOutput(outputText);
       } else {
         // Try to parse as structured text
-        return this.parseTextOutput(output);
+        return this.parseTextOutput(outputText);
       }
     } catch (error) {
       // If parsing fails, return raw output
-      return output;
+      return outputText;
     }
   }
 
@@ -277,10 +291,207 @@ export class P4Runner {
     return results.length === 1 ? results[0] : results;
   }
 
-  private parseMarshaled(output: string): any {
-    // Simplified marshaled parsing - in production, use proper library
-    // This is a placeholder implementation
-    return { raw: output, note: 'Marshaled parsing not fully implemented' };
+  private parseMarshaled(buffer: Buffer): any {
+    if (!buffer || buffer.length === 0) {
+      return [];
+    }
+
+    const refs: any[] = [];
+    let offset = 0;
+
+    const ensure = (length: number) => {
+      if (offset + length > buffer.length) {
+        throw new Error(`Unexpected end of marshaled data at offset ${offset}`);
+      }
+    };
+
+    const readByte = () => {
+      ensure(1);
+      return buffer[offset++];
+    };
+
+    const readInt32 = () => {
+      ensure(4);
+      const value = buffer.readInt32LE(offset);
+      offset += 4;
+      return value;
+    };
+
+    const readUInt16 = () => {
+      ensure(2);
+      const value = buffer.readUInt16LE(offset);
+      offset += 2;
+      return value;
+    };
+
+    const readDouble = () => {
+      ensure(8);
+      const value = buffer.readDoubleLE(offset);
+      offset += 8;
+      return value;
+    };
+
+    const readBytes = (length: number) => {
+      ensure(length);
+      const value = buffer.subarray(offset, offset + length);
+      offset += length;
+      return value;
+    };
+
+    const readString = (length: number) => readBytes(length).toString('utf8');
+
+    const parseLong = (digitCount: number): string | number => {
+      const absoluteDigitCount = Math.abs(digitCount);
+      let value = 0n;
+      for (let i = 0; i < absoluteDigitCount; i++) {
+        const digit = BigInt(readUInt16());
+        value += digit << BigInt(15 * i);
+      }
+      if (digitCount < 0) {
+        value = -value;
+      }
+
+      const asNumber = Number(value);
+      if (Number.isSafeInteger(asNumber)) {
+        return asNumber;
+      }
+      return value.toString();
+    };
+
+    const toObjectKey = (value: any): string => {
+      if (typeof value === 'string') return value;
+      if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+      if (value === null || value === undefined) return '';
+      return JSON.stringify(value);
+    };
+
+    const parseObject = (): any => {
+      const typeCode = readByte();
+      const hasRef = (typeCode & 0x80) !== 0;
+      const type = String.fromCharCode(typeCode & 0x7f);
+
+      let value: any;
+      switch (type) {
+        case '0':
+          return null; // TYPE_NULL
+        case 'N':
+          value = null;
+          break;
+        case 'F':
+          value = false;
+          break;
+        case 'T':
+          value = true;
+          break;
+        case 'S':
+          value = 'StopIteration';
+          break;
+        case '.':
+          value = 'Ellipsis';
+          break;
+        case 'i':
+          value = readInt32();
+          break;
+        case 'I': {
+          // 64-bit integer (little-endian)
+          ensure(8);
+          const low = buffer.readUInt32LE(offset);
+          const high = buffer.readInt32LE(offset + 4);
+          offset += 8;
+          const bigintValue = (BigInt(high) << 32n) + BigInt(low);
+          const asNumber = Number(bigintValue);
+          value = Number.isSafeInteger(asNumber) ? asNumber : bigintValue.toString();
+          break;
+        }
+        case 'l':
+          value = parseLong(readInt32());
+          break;
+        case 'f': {
+          const length = readByte();
+          value = parseFloat(readString(length));
+          break;
+        }
+        case 'g':
+          value = readDouble();
+          break;
+        case 's':
+        case 't':
+        case 'u':
+        case 'a':
+        case 'A':
+          value = readString(readInt32());
+          break;
+        case 'z':
+        case 'Z':
+          value = readString(readByte());
+          break;
+        case '(':
+        case '[': {
+          const size = readInt32();
+          const arr: any[] = [];
+          for (let i = 0; i < size; i++) {
+            arr.push(parseObject());
+          }
+          value = arr;
+          break;
+        }
+        case ')': {
+          const size = readByte();
+          const arr: any[] = [];
+          for (let i = 0; i < size; i++) {
+            arr.push(parseObject());
+          }
+          value = arr;
+          break;
+        }
+        case '{': {
+          const obj: Record<string, any> = {};
+          while (true) {
+            const key = parseObject();
+            if (key === null) {
+              break;
+            }
+            obj[toObjectKey(key)] = parseObject();
+          }
+          value = obj;
+          break;
+        }
+        case '<':
+        case '>': {
+          const size = readInt32();
+          const arr: any[] = [];
+          for (let i = 0; i < size; i++) {
+            arr.push(parseObject());
+          }
+          value = arr;
+          break;
+        }
+        case 'r':
+        case 'R': {
+          const index = readInt32();
+          value = refs[index];
+          break;
+        }
+        default:
+          throw new Error(`Unsupported marshaled type: ${type} (0x${(typeCode & 0x7f).toString(16)})`);
+      }
+
+      if (hasRef) {
+        refs.push(value);
+      }
+
+      return value;
+    };
+
+    const records: any[] = [];
+    while (offset < buffer.length) {
+      const value = parseObject();
+      if (value !== null || records.length > 0) {
+        records.push(value);
+      }
+    }
+
+    return records.length === 1 ? records[0] : records;
   }
 
   private parseTextOutput(output: string): any {

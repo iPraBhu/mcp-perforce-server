@@ -116,6 +116,24 @@ This document describes all available agents (tools) provided by the MCP Perforc
 - `workspacePath` (optional): Path to workspace directory  
 **Returns**: Results of moving/renaming files
 
+#### `p4.integrate`
+**Description**: Integrate files from source path to target path  
+**Parameters**:
+- `source`: Source filespec/path
+- `target`: Target filespec/path
+- `changelist` (optional): Changelist to associate with
+- `workspacePath` (optional): Path to workspace directory  
+**Returns**: Integration results for opened target files
+
+#### `p4.merge`
+**Description**: Merge files from source path to target path  
+**Parameters**:
+- `source`: Source filespec/path
+- `target`: Target filespec/path
+- `changelist` (optional): Changelist to associate with
+- `workspacePath` (optional): Path to workspace directory  
+**Returns**: Merge/open results for target files
+
 #### `p4.blame`
 **Description**: Show file annotations (like git blame)  
 **Parameters**:
@@ -229,6 +247,22 @@ This document describes all available agents (tools) provided by the MCP Perforc
 - `workspacePath` (optional): Path to workspace directory  
 **Returns**: Revision history with changelist information
 
+#### `p4.fstat`
+**Description**: Show file metadata (`p4 fstat`)  
+**Parameters**:
+- `filespec`: Filespec to inspect
+- `max` (optional): Maximum results
+- `workspacePath` (optional): Path to workspace directory  
+**Returns**: Structured metadata records for matching files
+
+#### `p4.print`
+**Description**: Print depot file content (`p4 print`)  
+**Parameters**:
+- `filespec`: Filespec to print
+- `quiet` (optional, default true): Suppress headers
+- `workspacePath` (optional): Path to workspace directory  
+**Returns**: Printed file content
+
 ### User & Client Management
 
 #### `p4.users`
@@ -296,6 +330,21 @@ This document describes all available agents (tools) provided by the MCP Perforc
 - `label`: Label name to get details for
 - `workspacePath` (optional): Path to workspace directory  
 **Returns**: Complete label information including files
+
+#### `p4.streams`
+**Description**: List streams  
+**Parameters**:
+- `stream` (optional): Stream path filter
+- `max` (optional): Maximum results
+- `workspacePath` (optional): Path to workspace directory  
+**Returns**: List of streams
+
+#### `p4.stream`
+**Description**: Get stream specification  
+**Parameters**:
+- `stream`: Stream path/name
+- `workspacePath` (optional): Path to workspace directory  
+**Returns**: Stream spec details
 
 ### Analytics & Monitoring
 

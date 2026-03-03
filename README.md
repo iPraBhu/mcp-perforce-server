@@ -11,7 +11,7 @@ Enterprise-grade MCP (Model Context Protocol) server providing secure, non-inter
 
 ## Overview
 
-Production-ready server that exposes **37+ Perforce VCS operations** through the Model Context Protocol, enabling AI assistants and code editors to interact with Perforce repositories safely and efficiently. Perfect for DevOps automation, enterprise development workflows, and AI-powered version control management.
+Production-ready server that exposes **47+ Perforce VCS operations** through the Model Context Protocol, enabling AI assistants and code editors to interact with Perforce repositories safely and efficiently. Perfect for DevOps automation, enterprise development workflows, and AI-powered version control management.
 
 **Key Features:**
 - 🔒 **Enterprise Security** - Read-only defaults with configurable access controls
@@ -41,7 +41,7 @@ Production-ready server that exposes **37+ Perforce VCS operations** through the
 - **SOC 2, GDPR, HIPAA ready** with structured compliance reporting
 
 ### 🤖 AI Assistant Integration
-- **37+ Perforce operations** exposed through MCP protocol
+- **47+ Perforce operations** exposed through MCP protocol
 - **Structured JSON responses** for reliable AI parsing
 - **Non-interactive execution** - no user prompts or confirmations
 - **Error handling** with standardized error codes
@@ -97,7 +97,7 @@ Production-ready server that exposes **37+ Perforce VCS operations** through the
 - **Data retention policies** configurable for different compliance needs
 
 ### 🤖 **AI-First Design**
-- **37+ Perforce operations** through standardized MCP protocol
+- **47+ Perforce operations** through standardized MCP protocol
 - **Non-interactive execution** perfect for AI assistants and automation
 - **Structured error handling** with detailed error codes and recovery suggestions
 - **Context-aware operations** that understand Perforce workflows
@@ -330,6 +330,8 @@ P4_RATE_LIMIT_BLOCK_MS=3600000
 - `p4.diff2` - Compare two depot paths server-side (depot-to-depot diff)
 - `p4.copy` - Copy files between locations
 - `p4.move` - Move/rename files
+- `p4.integrate` - Integrate files from source to target
+- `p4.merge` - Merge files from source to target
 - `p4.blame` - Show file annotations (like git blame)
 
 ### Merge & Conflict Resolution
@@ -350,6 +352,8 @@ P4_RATE_LIMIT_BLOCK_MS=3600000
 - `p4.files` - List files in depot with metadata
 - `p4.dirs` - List directories in depot
 - `p4.filelog` - File history
+- `p4.fstat` - File metadata (Perforce fstat)
+- `p4.print` - Print depot file contents
 
 ### User & Client Management
 - `p4.users` - List Perforce users
@@ -365,6 +369,10 @@ P4_RATE_LIMIT_BLOCK_MS=3600000
 ### Labels & Organization
 - `p4.labels` - List labels
 - `p4.label` - Get label details
+
+### Streams
+- `p4.streams` - List streams
+- `p4.stream` - Get stream spec details
 
 ### Analytics & Monitoring
 - `p4.sizes` - File size and disk usage statistics
@@ -562,7 +570,7 @@ Standardized error codes for reliable error handling:
 
 #### **Server Core (`src/server.ts`)**
 - **MCP Protocol Handler**: JSON-RPC 2.0 implementation
-- **Tool Registry**: 37+ Perforce operations with security validation
+- **Tool Registry**: 47+ Perforce operations with security validation
 - **Request Processing**: Async handling with error recovery
 - **Configuration Management**: Environment variable processing
 

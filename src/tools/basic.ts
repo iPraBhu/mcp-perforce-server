@@ -504,10 +504,9 @@ export async function p4Sync(
     parseOutput: false,
   });
   
-  // TODO: Add parseSyncOutput function if structured output is needed
-  // if (result.ok && result.result) {
-  //   result.result = parse.parseSyncOutput(result.result as string);
-  // }
+  if (result.ok && result.result) {
+    result.result = parse.parseSyncOutput(result.result as string);
+  }
   
   result.configUsed = {
     ...result.configUsed,
@@ -541,10 +540,9 @@ export async function p4Diff(
     parseOutput: false,
   });
   
-  // TODO: Add parseDiffOutput function if structured output is needed
-  // if (result.ok && result.result) {
-  //   result.result = parse.parseDiffOutput(result.result as string);
-  // }
+  if (result.ok && result.result) {
+    result.result = parse.parseDiffOutput(result.result as string);
+  }
   
   result.configUsed = {
     ...result.configUsed,
@@ -735,10 +733,9 @@ export async function p4Resolve(
     parseOutput: false,
   });
 
-  // TODO: Add parseResolveOutput function if structured output is needed
-  // if (result.ok && result.result) {
-  //   result.result = parse.parseResolveOutput(result.result as string);
-  // }
+  if (result.ok && result.result) {
+    result.result = parse.parseResolveOutput(result.result as string);
+  }
 
   result.configUsed = {
     ...result.configUsed,
@@ -800,10 +797,9 @@ export async function p4Shelve(
     parseOutput: false,
   });
 
-  // TODO: Add parseShelveOutput function if structured output is needed
-  // if (result.ok && result.result) {
-  //   result.result = parse.parseShelveOutput(result.result as string);
-  // }
+  if (result.ok && result.result) {
+    result.result = parse.parseShelveOutput(result.result as string);
+  }
 
   result.configUsed = {
     ...result.configUsed,
@@ -865,10 +861,9 @@ export async function p4Unshelve(
     parseOutput: false,
   });
 
-  // TODO: Add parseUnshelveOutput function if structured output is needed
-  // if (result.ok && result.result) {
-  //   result.result = parse.parseUnshelveOutput(result.result as string);
-  // }
+  if (result.ok && result.result) {
+    result.result = parse.parseUnshelveOutput(result.result as string);
+  }
 
   result.configUsed = {
     ...result.configUsed,
@@ -986,10 +981,9 @@ export async function p4Blame(
     parseOutput: false,
   });
 
-  // TODO: Add parseBlameOutput function if structured output is needed
-  // if (result.ok && result.result) {
-  //   result.result = parse.parseBlameOutput(result.result as string);
-  // }
+  if (result.ok && result.result) {
+    result.result = parse.parseBlameOutput(result.result as string);
+  }
 
   result.configUsed = {
     ...result.configUsed,
@@ -1080,10 +1074,9 @@ export async function p4Copy(
     parseOutput: false,
   });
 
-  // TODO: Add parseCopyOutput function if structured output is needed
-  // if (result.ok && result.result) {
-  //   result.result = parse.parseCopyOutput(result.result as string);
-  // }
+  if (result.ok && result.result) {
+    result.result = parse.parseCopyOutput(result.result as string);
+  }
 
   result.configUsed = {
     ...result.configUsed,
@@ -1174,10 +1167,9 @@ export async function p4Move(
     parseOutput: false,
   });
 
-  // TODO: Add parseMoveOutput function if structured output is needed
-  // if (result.ok && result.result) {
-  //   result.result = parse.parseMoveOutput(result.result as string);
-  // }
+  if (result.ok && result.result) {
+    result.result = parse.parseMoveOutput(result.result as string);
+  }
 
   result.configUsed = {
     ...result.configUsed,
@@ -1261,10 +1253,9 @@ export async function p4Grep(
     parseOutput: false,
   });
 
-  // TODO: Add parseGrepOutput function if structured output is needed
-  // if (result.ok && result.result) {
-  //   result.result = parse.parseGrepOutput(result.result as string);
-  // }
+  if (result.ok && result.result) {
+    result.result = parse.parseGrepOutput(result.result as string);
+  }
 
   result.configUsed = {
     ...result.configUsed,
@@ -1316,10 +1307,9 @@ export async function p4Files(
     parseOutput: false,
   });
 
-  // TODO: Add parseFilesOutput function if structured output is needed
-  // if (result.ok && result.result) {
-  //   result.result = parse.parseFilesOutput(result.result as string);
-  // }
+  if (result.ok && result.result) {
+    result.result = parse.parseFilesOutput(result.result as string);
+  }
 
   result.configUsed = {
     ...result.configUsed,
@@ -1367,10 +1357,378 @@ export async function p4Dirs(
     parseOutput: false,
   });
 
-  // TODO: Add parseDirsOutput function if structured output is needed
-  // if (result.ok && result.result) {
-  //   result.result = parse.parseDirsOutput(result.result as string);
-  // }
+  if (result.ok && result.result) {
+    result.result = parse.parseDirsOutput(result.result as string);
+  }
+
+  result.configUsed = {
+    ...result.configUsed,
+    p4configPath: configResult.configPath,
+  };
+
+  return result;
+}
+
+/**
+ * p4 integrate - Integrate files from source to target
+ */
+export async function p4Integrate(
+  context: ToolContext,
+  args: { source: string; target: string; changelist?: string; workspacePath?: string }
+): Promise<P4RunResult> {
+  if (!args.source || !args.target) {
+    return {
+      ok: false,
+      command: 'integrate',
+      args: [],
+      cwd: process.cwd(),
+      configUsed: {},
+      error: {
+        code: 'P4_INVALID_ARGS',
+        message: 'source and target parameters are required',
+      },
+    };
+  }
+
+  if (context.serverConfig.readOnlyMode) {
+    return {
+      ok: false,
+      command: 'integrate',
+      args: [],
+      cwd: process.cwd(),
+      configUsed: {},
+      error: {
+        code: 'P4_READONLY_MODE',
+        message: 'Server is in read-only mode. Set P4_READONLY_MODE=false to enable write operations.',
+      },
+    };
+  }
+
+  const sourceSanitization = context.security.sanitizeInput(args.source, 'filespec');
+  const targetSanitization = context.security.sanitizeInput(args.target, 'filespec');
+  if (!sourceSanitization.valid || !targetSanitization.valid) {
+    return {
+      ok: false,
+      command: 'integrate',
+      args: [],
+      cwd: process.cwd(),
+      configUsed: {},
+      error: {
+        code: 'P4_INVALID_ARGS',
+        message: 'Invalid source or target filespec',
+      },
+    };
+  }
+
+  const { cwd, env, configResult } = await context.config.setupForCommand(args.workspacePath);
+
+  const cmdArgs: string[] = [];
+  if (args.changelist) {
+    cmdArgs.push('-c', args.changelist);
+  }
+  cmdArgs.push(sourceSanitization.sanitized, targetSanitization.sanitized);
+
+  const result = await context.runner.run('integrate', cmdArgs, cwd, {
+    env,
+    useZtag: false,
+    parseOutput: false,
+  });
+
+  if (result.ok && result.result) {
+    result.result = parse.parseIntegrateOutput(result.result as string);
+  }
+
+  result.configUsed = {
+    ...result.configUsed,
+    p4configPath: configResult.configPath,
+  };
+
+  return result;
+}
+
+/**
+ * p4 merge - Merge files from source to target
+ */
+export async function p4Merge(
+  context: ToolContext,
+  args: { source: string; target: string; changelist?: string; workspacePath?: string }
+): Promise<P4RunResult> {
+  if (!args.source || !args.target) {
+    return {
+      ok: false,
+      command: 'merge',
+      args: [],
+      cwd: process.cwd(),
+      configUsed: {},
+      error: {
+        code: 'P4_INVALID_ARGS',
+        message: 'source and target parameters are required',
+      },
+    };
+  }
+
+  if (context.serverConfig.readOnlyMode) {
+    return {
+      ok: false,
+      command: 'merge',
+      args: [],
+      cwd: process.cwd(),
+      configUsed: {},
+      error: {
+        code: 'P4_READONLY_MODE',
+        message: 'Server is in read-only mode. Set P4_READONLY_MODE=false to enable write operations.',
+      },
+    };
+  }
+
+  const sourceSanitization = context.security.sanitizeInput(args.source, 'filespec');
+  const targetSanitization = context.security.sanitizeInput(args.target, 'filespec');
+  if (!sourceSanitization.valid || !targetSanitization.valid) {
+    return {
+      ok: false,
+      command: 'merge',
+      args: [],
+      cwd: process.cwd(),
+      configUsed: {},
+      error: {
+        code: 'P4_INVALID_ARGS',
+        message: 'Invalid source or target filespec',
+      },
+    };
+  }
+
+  const { cwd, env, configResult } = await context.config.setupForCommand(args.workspacePath);
+
+  const cmdArgs: string[] = [];
+  if (args.changelist) {
+    cmdArgs.push('-c', args.changelist);
+  }
+  cmdArgs.push(sourceSanitization.sanitized, targetSanitization.sanitized);
+
+  const result = await context.runner.run('merge', cmdArgs, cwd, {
+    env,
+    useZtag: false,
+    parseOutput: false,
+  });
+
+  if (result.ok && result.result) {
+    result.result = parse.parseIntegrateOutput(result.result as string);
+  }
+
+  result.configUsed = {
+    ...result.configUsed,
+    p4configPath: configResult.configPath,
+  };
+
+  return result;
+}
+
+/**
+ * p4 print - Print file contents from depot
+ */
+export async function p4Print(
+  context: ToolContext,
+  args: { filespec: string; quiet?: boolean; workspacePath?: string }
+): Promise<P4RunResult> {
+  if (!args.filespec) {
+    return {
+      ok: false,
+      command: 'print',
+      args: [],
+      cwd: process.cwd(),
+      configUsed: {},
+      error: {
+        code: 'P4_INVALID_ARGS',
+        message: 'filespec parameter is required',
+      },
+    };
+  }
+
+  const filespecSanitization = context.security.sanitizeInput(args.filespec, 'filespec');
+  if (!filespecSanitization.valid) {
+    return {
+      ok: false,
+      command: 'print',
+      args: [],
+      cwd: process.cwd(),
+      configUsed: {},
+      error: {
+        code: 'P4_INVALID_ARGS',
+        message: `Invalid filespec: ${filespecSanitization.warnings.join(', ')}`,
+      },
+    };
+  }
+
+  const { cwd, env, configResult } = await context.config.setupForCommand(args.workspacePath);
+
+  const cmdArgs: string[] = [];
+  if (args.quiet !== false) {
+    cmdArgs.push('-q');
+  }
+  cmdArgs.push(filespecSanitization.sanitized);
+
+  const result = await context.runner.run('print', cmdArgs, cwd, {
+    env,
+    useZtag: false,
+    parseOutput: false,
+  });
+
+  if (result.ok && result.result) {
+    result.result = parse.parsePrintOutput(result.result as string);
+  }
+
+  result.configUsed = {
+    ...result.configUsed,
+    p4configPath: configResult.configPath,
+  };
+
+  return result;
+}
+
+/**
+ * p4 fstat - Show file metadata from depot/workspace
+ */
+export async function p4Fstat(
+  context: ToolContext,
+  args: { filespec: string; max?: number; workspacePath?: string }
+): Promise<P4RunResult> {
+  if (!args.filespec) {
+    return {
+      ok: false,
+      command: 'fstat',
+      args: [],
+      cwd: process.cwd(),
+      configUsed: {},
+      error: {
+        code: 'P4_INVALID_ARGS',
+        message: 'filespec parameter is required',
+      },
+    };
+  }
+
+  const filespecSanitization = context.security.sanitizeInput(args.filespec, 'filespec');
+  if (!filespecSanitization.valid) {
+    return {
+      ok: false,
+      command: 'fstat',
+      args: [],
+      cwd: process.cwd(),
+      configUsed: {},
+      error: {
+        code: 'P4_INVALID_ARGS',
+        message: `Invalid filespec: ${filespecSanitization.warnings.join(', ')}`,
+      },
+    };
+  }
+
+  const { cwd, env, configResult } = await context.config.setupForCommand(args.workspacePath);
+
+  const cmdArgs: string[] = [];
+  if (args.max) {
+    cmdArgs.push('-m', args.max.toString());
+  }
+  cmdArgs.push(filespecSanitization.sanitized);
+
+  const result = await context.runner.run('fstat', cmdArgs, cwd, {
+    env,
+    useZtag: true,
+    parseOutput: false,
+  });
+
+  if (result.ok && result.result) {
+    result.result = parse.parseFstatOutput(result.result as string);
+  }
+
+  result.configUsed = {
+    ...result.configUsed,
+    p4configPath: configResult.configPath,
+  };
+
+  return result;
+}
+
+/**
+ * p4 streams - List streams
+ */
+export async function p4Streams(
+  context: ToolContext,
+  args: { max?: number; stream?: string; workspacePath?: string } = {}
+): Promise<P4RunResult> {
+  const { cwd, env, configResult } = await context.config.setupForCommand(args.workspacePath);
+
+  const cmdArgs: string[] = [];
+  if (args.max) {
+    cmdArgs.push('-m', args.max.toString());
+  }
+  if (args.stream) {
+    cmdArgs.push(args.stream);
+  }
+
+  const result = await context.runner.run('streams', cmdArgs, cwd, {
+    env,
+    useZtag: false,
+    parseOutput: false,
+  });
+
+  if (result.ok && result.result) {
+    result.result = parse.parseStreamsOutput(result.result as string);
+  }
+
+  result.configUsed = {
+    ...result.configUsed,
+    p4configPath: configResult.configPath,
+  };
+
+  return result;
+}
+
+/**
+ * p4 stream - Get a stream spec
+ */
+export async function p4Stream(
+  context: ToolContext,
+  args: { stream: string; workspacePath?: string }
+): Promise<P4RunResult> {
+  if (!args.stream) {
+    return {
+      ok: false,
+      command: 'stream',
+      args: [],
+      cwd: process.cwd(),
+      configUsed: {},
+      error: {
+        code: 'P4_INVALID_ARGS',
+        message: 'stream parameter is required',
+      },
+    };
+  }
+
+  const streamSanitization = context.security.sanitizeInput(args.stream, 'filespec');
+  if (!streamSanitization.valid) {
+    return {
+      ok: false,
+      command: 'stream',
+      args: [],
+      cwd: process.cwd(),
+      configUsed: {},
+      error: {
+        code: 'P4_INVALID_ARGS',
+        message: `Invalid stream: ${streamSanitization.warnings.join(', ')}`,
+      },
+    };
+  }
+
+  const { cwd, env, configResult } = await context.config.setupForCommand(args.workspacePath);
+
+  const result = await context.runner.run('stream', ['-o', streamSanitization.sanitized], cwd, {
+    env,
+    useZtag: false,
+    parseOutput: false,
+  });
+
+  if (result.ok && result.result) {
+    result.result = parse.parseStreamOutput(result.result as string);
+  }
 
   result.configUsed = {
     ...result.configUsed,

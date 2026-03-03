@@ -11,6 +11,7 @@ async function testComponents() {
     // Test core imports
     const { P4Runner } = require('./dist/p4/runner.js');
     const { P4Config } = require('./dist/p4/config.js');
+    const parse = require('./dist/p4/parse.js');
     const tools = require('./dist/tools/index.js');
     
     console.error('[TEST] ✓ All core components imported successfully');
@@ -64,7 +65,8 @@ async function testComponents() {
     // Test basic tool availability
     const availableTools = [
       'p4Info', 'p4Status', 'p4Add', 'p4Edit', 'p4Delete', 'p4Revert',
-      'p4Sync', 'p4Opened', 'p4Diff', 'p4Diff2', 'p4ChangelistCreate', 'p4ChangelistUpdate',
+      'p4Sync', 'p4Opened', 'p4Diff', 'p4Diff2', 'p4Integrate', 'p4Merge', 'p4Print', 'p4Fstat', 'p4Streams', 'p4Stream',
+      'p4ChangelistCreate', 'p4ChangelistUpdate',
       'p4ChangelistSubmit', 'p4Submit', 'p4Describe', 'p4Filelog', 'p4Clients',
       'p4ConfigDetect'
     ];
@@ -77,6 +79,55 @@ async function testComponents() {
       }
     }
     
+    // Parser behavior checks with representative script-mode output
+    const parsedSync = parse.parseSyncOutput('info1: //depot/main/file.txt#3 - updating C:\\\\ws\\\\file.txt\nexit: 0\n');
+    if (Array.isArray(parsedSync) && parsedSync.length === 1) {
+      console.error('[TEST] âœ“ parseSyncOutput handles script-mode prefixes');
+    } else {
+      console.error('[TEST] âœ— parseSyncOutput failed on script-mode input');
+    }
+
+    const parsedDescribe = parse.parseDescribeOutput(
+      'info1: Change 123 by user@client on 2026/03/03 10:00:00\n' +
+      'info1: \tFix issue\n' +
+      'info1: Affected files ...\n' +
+      'info1: ... //depot/main/file.txt#7 edit\n' +
+      'exit: 0\n'
+    );
+    if (parsedDescribe.change === 123 && Array.isArray(parsedDescribe.files) && parsedDescribe.files.length === 1) {
+      console.error('[TEST] âœ“ parseDescribeOutput returns structured changelist data');
+    } else {
+      console.error('[TEST] âœ— parseDescribeOutput failed');
+    }
+
+    const parsedFstat = parse.parseFstatOutput('... depotFile //depot/main/file.txt\n... headRev 7\n');
+    if (Array.isArray(parsedFstat) && parsedFstat.length >= 1) {
+      console.error('[TEST] âœ“ parseFstatOutput returns structured metadata');
+    } else {
+      console.error('[TEST] âœ— parseFstatOutput failed');
+    }
+
+    // Marshaled parser behavior check (dict: {"key":"value"})
+    const marshalUnicode = (text) => {
+      const textBuffer = Buffer.from(text, 'utf8');
+      const header = Buffer.alloc(5);
+      header[0] = 'u'.charCodeAt(0);
+      header.writeInt32LE(textBuffer.length, 1);
+      return Buffer.concat([header, textBuffer]);
+    };
+    const marshaledDict = Buffer.concat([
+      Buffer.from([ '{'.charCodeAt(0) ]),
+      marshalUnicode('key'),
+      marshalUnicode('value'),
+      Buffer.from([ '0'.charCodeAt(0) ]),
+    ]);
+    const marshaledParsed = runner.parseOutput(marshaledDict, false, true);
+    if (marshaledParsed && marshaledParsed.key === 'value') {
+      console.error('[TEST] âœ“ Marshaled output parser decodes dictionary payloads');
+    } else {
+      console.error('[TEST] âœ— Marshaled output parser failed');
+    }
+
     // Test config detection tool
     const configDetectResult = await tools.p4ConfigDetect(context, { workspacePath: __dirname });
     console.error(`[TEST] ✓ Config detect tool works: ${configDetectResult.ok}`);

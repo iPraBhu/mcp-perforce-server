@@ -21,6 +21,12 @@ export {
   p4Blame,
   p4Copy,
   p4Move,
+  p4Integrate,
+  p4Merge,
+  p4Print,
+  p4Fstat,
+  p4Streams,
+  p4Stream,
   p4Grep,
   p4Files,
   p4Dirs
