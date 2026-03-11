@@ -4,6 +4,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Node.js Version](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen)](https://nodejs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-Ready-blue)](https://www.typescriptlang.org/)
+[![MCPAmpel](https://img.shields.io/endpoint?url=https://mcpampel.com/badge/iPraBhu/mcp-perforce-server.json)](https://mcpampel.com/repo/iPraBhu/mcp-perforce-server)
 
 MCP server for Perforce (P4) with safe defaults, fast execution, and structured JSON responses.
 
