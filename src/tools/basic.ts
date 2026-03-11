@@ -952,6 +952,323 @@ export async function p4Changes(
 }
 
 /**
+ * p4 review - List changelists pending review
+ */
+export async function p4Review(
+  context: ToolContext,
+  args: {
+    counter?: string;
+    filespec?: string;
+    workspacePath?: string;
+  } = {}
+): Promise<P4RunResult> {
+  if (args.counter && !/^\d+$/.test(args.counter)) {
+    return {
+      ok: false,
+      command: 'review',
+      args: [],
+      cwd: process.cwd(),
+      configUsed: {},
+      error: {
+        code: 'P4_INVALID_ARGS',
+        message: 'counter must be a numeric string',
+      },
+    };
+  }
+
+  let sanitizedFilespec: string | undefined;
+  if (args.filespec) {
+    const filespecSanitization = context.security.sanitizeInput(args.filespec, 'filespec');
+    if (!filespecSanitization.valid) {
+      return {
+        ok: false,
+        command: 'review',
+        args: [],
+        cwd: process.cwd(),
+        configUsed: {},
+        error: {
+          code: 'P4_INVALID_ARGS',
+          message: `Invalid filespec: ${filespecSanitization.warnings.join(', ')}`,
+        },
+      };
+    }
+    sanitizedFilespec = filespecSanitization.sanitized;
+  }
+
+  const { cwd, env, configResult } = await context.config.setupForCommand(args.workspacePath);
+  const cmdArgs: string[] = [];
+  if (args.counter) {
+    cmdArgs.push('-t', args.counter);
+  }
+  if (sanitizedFilespec) {
+    cmdArgs.push(sanitizedFilespec);
+  }
+
+  const result = await context.runner.run('review', cmdArgs, cwd, {
+    env,
+    useZtag: false,
+    parseOutput: false,
+  });
+
+  if (result.ok && result.result !== null && result.result !== undefined) {
+    if (typeof result.result === 'string' && result.result.trim().length > 0) {
+      result.result = parse.parseReviewOutput(result.result);
+    } else {
+      result.result = [];
+    }
+  } else if (result.ok) {
+    result.result = [];
+  }
+
+  result.configUsed = {
+    ...result.configUsed,
+    p4configPath: configResult.configPath,
+  };
+
+  return result;
+}
+
+/**
+ * p4 reviews - List users who review specified files/changelists
+ */
+export async function p4Reviews(
+  context: ToolContext,
+  args: {
+    files?: string[];
+    changelist?: string;
+    workspacePath?: string;
+  } = {}
+): Promise<P4RunResult> {
+  if (args.files) {
+    const filesValidation = validateFiles(args.files);
+    if (!filesValidation.valid) {
+      return {
+        ok: false,
+        command: 'reviews',
+        args: [],
+        cwd: process.cwd(),
+        configUsed: {},
+        error: {
+          code: 'P4_INVALID_ARGS',
+          message: `Invalid files: ${filesValidation.error}`,
+        },
+      };
+    }
+  }
+
+  if (args.changelist) {
+    const changelistValidation = validateChangelist(args.changelist);
+    if (!changelistValidation.valid) {
+      return {
+        ok: false,
+        command: 'reviews',
+        args: [],
+        cwd: process.cwd(),
+        configUsed: {},
+        error: {
+          code: 'P4_INVALID_ARGS',
+          message: `Invalid changelist: ${changelistValidation.error}`,
+        },
+      };
+    }
+  }
+
+  const { cwd, env, configResult } = await context.config.setupForCommand(args.workspacePath);
+  const cmdArgs: string[] = [];
+  if (args.changelist) {
+    cmdArgs.push('-c', args.changelist);
+  }
+  if (args.files && args.files.length > 0) {
+    cmdArgs.push(...args.files);
+  }
+
+  const result = await context.runner.run('reviews', cmdArgs, cwd, {
+    env,
+    useZtag: false,
+    parseOutput: false,
+  });
+
+  if (result.ok && result.result !== null && result.result !== undefined) {
+    if (typeof result.result === 'string' && result.result.trim().length > 0) {
+      result.result = parse.parseReviewsOutput(result.result);
+    } else {
+      result.result = [];
+    }
+  } else if (result.ok) {
+    result.result = [];
+  }
+
+  result.configUsed = {
+    ...result.configUsed,
+    p4configPath: configResult.configPath,
+  };
+
+  return result;
+}
+
+/**
+ * p4 interchanges - List changelists not yet integrated between paths
+ */
+export async function p4Interchanges(
+  context: ToolContext,
+  args: {
+    sourcePath: string;
+    targetPath: string;
+    max?: number;
+    longDescription?: boolean;
+    workspacePath?: string;
+  }
+): Promise<P4RunResult> {
+  if (!args.sourcePath || !args.targetPath) {
+    return {
+      ok: false,
+      command: 'interchanges',
+      args: [],
+      cwd: process.cwd(),
+      configUsed: {},
+      error: {
+        code: 'P4_INVALID_ARGS',
+        message: 'sourcePath and targetPath parameters are required',
+      },
+    };
+  }
+
+  const sourceSanitization = context.security.sanitizeInput(args.sourcePath, 'filespec');
+  const targetSanitization = context.security.sanitizeInput(args.targetPath, 'filespec');
+  if (!sourceSanitization.valid || !targetSanitization.valid) {
+    return {
+      ok: false,
+      command: 'interchanges',
+      args: [],
+      cwd: process.cwd(),
+      configUsed: {},
+      error: {
+        code: 'P4_INVALID_ARGS',
+        message: 'Invalid sourcePath or targetPath filespec',
+      },
+    };
+  }
+
+  const { cwd, env, configResult } = await context.config.setupForCommand(args.workspacePath);
+  const cmdArgs: string[] = [];
+  if (args.longDescription) {
+    cmdArgs.push('-l');
+  }
+  if (args.max && args.max > 0) {
+    cmdArgs.push('-m', args.max.toString());
+  }
+  cmdArgs.push(sourceSanitization.sanitized, targetSanitization.sanitized);
+
+  const result = await context.runner.run('interchanges', cmdArgs, cwd, {
+    env,
+    useZtag: false,
+    parseOutput: false,
+  });
+
+  if (result.ok && result.result !== null && result.result !== undefined) {
+    if (typeof result.result === 'string' && result.result.trim().length > 0) {
+      result.result = parse.parseInterchangesOutput(result.result);
+    } else {
+      result.result = [];
+    }
+  } else if (result.ok) {
+    result.result = [];
+  }
+
+  result.configUsed = {
+    ...result.configUsed,
+    p4configPath: configResult.configPath,
+  };
+
+  return result;
+}
+
+/**
+ * p4 integrated - Show integration history between paths
+ */
+export async function p4Integrated(
+  context: ToolContext,
+  args: { sourcePath: string; targetPath?: string; workspacePath?: string }
+): Promise<P4RunResult> {
+  if (!args.sourcePath) {
+    return {
+      ok: false,
+      command: 'integrated',
+      args: [],
+      cwd: process.cwd(),
+      configUsed: {},
+      error: {
+        code: 'P4_INVALID_ARGS',
+        message: 'sourcePath parameter is required',
+      },
+    };
+  }
+
+  const sourceSanitization = context.security.sanitizeInput(args.sourcePath, 'filespec');
+  if (!sourceSanitization.valid) {
+    return {
+      ok: false,
+      command: 'integrated',
+      args: [],
+      cwd: process.cwd(),
+      configUsed: {},
+      error: {
+        code: 'P4_INVALID_ARGS',
+        message: `Invalid sourcePath: ${sourceSanitization.warnings.join(', ')}`,
+      },
+    };
+  }
+
+  let targetSanitized: string | undefined;
+  if (args.targetPath) {
+    const targetSanitization = context.security.sanitizeInput(args.targetPath, 'filespec');
+    if (!targetSanitization.valid) {
+      return {
+        ok: false,
+        command: 'integrated',
+        args: [],
+        cwd: process.cwd(),
+        configUsed: {},
+        error: {
+          code: 'P4_INVALID_ARGS',
+          message: `Invalid targetPath: ${targetSanitization.warnings.join(', ')}`,
+        },
+      };
+    }
+    targetSanitized = targetSanitization.sanitized;
+  }
+
+  const { cwd, env, configResult } = await context.config.setupForCommand(args.workspacePath);
+  const cmdArgs: string[] = [sourceSanitization.sanitized];
+  if (targetSanitized) {
+    cmdArgs.push(targetSanitized);
+  }
+
+  const result = await context.runner.run('integrated', cmdArgs, cwd, {
+    env,
+    useZtag: false,
+    parseOutput: false,
+  });
+
+  if (result.ok && result.result !== null && result.result !== undefined) {
+    if (typeof result.result === 'string' && result.result.trim().length > 0) {
+      result.result = parse.parseIntegratedOutput(result.result);
+    } else {
+      result.result = [];
+    }
+  } else if (result.ok) {
+    result.result = [];
+  }
+
+  result.configUsed = {
+    ...result.configUsed,
+    p4configPath: configResult.configPath,
+  };
+
+  return result;
+}
+
+/**
  * p4 blame - Show file annotations with change history
  */
 export async function p4Blame(
@@ -989,6 +1306,20 @@ export async function p4Blame(
     p4configPath: configResult.configPath,
   };
 
+  return result;
+}
+
+/**
+ * p4 annotate - Alias for line-by-line annotation
+ */
+export async function p4Annotate(
+  context: ToolContext,
+  args: { file: string; workspacePath?: string }
+): Promise<P4RunResult> {
+  const result = await p4Blame(context, args);
+  if (result.command === 'blame') {
+    result.command = 'annotate';
+  }
   return result;
 }
 

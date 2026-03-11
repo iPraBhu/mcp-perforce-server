@@ -111,7 +111,12 @@ Diff behavior:
 ### `p4.blame`
 - Purpose: Annotate file history by line.
 - Parameters: `file` (required), `workspacePath?`
-- CLI equivalent: `p4 annotate -q <file>`
+- CLI equivalent: `p4 annotate -a <file>`
+
+### `p4.annotate`
+- Purpose: Alias of `p4.blame` for line annotation.
+- Parameters: `file` (required), `workspacePath?`
+- CLI equivalent: `p4 annotate -a <file>`
 
 ## Merge and Conflict Resolution
 
@@ -163,6 +168,43 @@ Diff behavior:
 - Purpose: List changelists with filters.
 - Parameters: `status?`, `user?`, `client?`, `max?`, `filespec?`, `workspacePath?`
 - CLI equivalent: `p4 changes [filters]`
+
+### `p4.review`
+- Purpose: List changelists pending review.
+- Parameters: `counter?`, `filespec?`, `workspacePath?`
+- CLI equivalent: `p4 review [-t counter] [filespec]`
+
+### `p4.reviews`
+- Purpose: List reviewers for files or a changelist.
+- Parameters: `changelist?`, `files?`, `workspacePath?`
+- CLI equivalent: `p4 reviews [-c changelist] [files...]`
+
+### `p4.interchanges`
+- Purpose: List changelists not yet integrated between two paths.
+- Parameters: `sourcePath` (required), `targetPath` (required), `max?`, `longDescription?`, `workspacePath?`
+- CLI equivalent: `p4 interchanges [-l] [-m max] <sourcePath> <targetPath>`
+
+### `p4.integrated`
+- Purpose: Show integration history between source/target paths.
+- Parameters: `sourcePath` (required), `targetPath?`, `workspacePath?`
+- CLI equivalent: `p4 integrated <sourcePath> [targetPath]`
+
+## Workflow Composites
+
+### `p4.review.bundle`
+- Purpose: Composite review helper that combines `p4.review` with optional `p4.describe` and `p4.reviews`.
+- Parameters: `counter?`, `filespec?`, `maxChanges?`, `includeDescribe?`, `includeReviewers?`, `workspacePath?`
+- Notes: Returns a single bundle result with step status and aggregated change entries.
+
+### `p4.change.inspect`
+- Purpose: Composite changelist inspector combining `p4.describe`, `p4.fixes`, `p4.reviews`, and optional `p4.filelog`.
+- Parameters: `changelist` (required), `includeFileHistory?`, `maxFilesWithHistory?`, `maxRevisions?`, `workspacePath?`
+- Notes: Designed for one-shot code review context on a specific changelist.
+
+### `p4.path.synccheck`
+- Purpose: Composite branch/path sync analysis using `p4.interchanges` and optional `p4.integrated`.
+- Parameters: `sourcePath` (required), `targetPath` (required), `maxInterchanges?`, `includeIntegrated?`, `checkBothDirections?`, `workspacePath?`
+- Notes: Returns forward/reverse drift counts and a computed sync state.
 
 ## Search and Discovery
 

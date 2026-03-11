@@ -68,6 +68,8 @@ async function testComponents() {
       'p4Sync', 'p4Opened', 'p4Diff', 'p4Diff2', 'p4Integrate', 'p4Merge', 'p4Print', 'p4Fstat', 'p4Streams', 'p4Stream',
       'p4ChangelistCreate', 'p4ChangelistUpdate',
       'p4ChangelistSubmit', 'p4Submit', 'p4Describe', 'p4Filelog', 'p4Clients',
+      'p4Review', 'p4Reviews', 'p4Interchanges', 'p4Integrated', 'p4Annotate',
+      'p4ReviewBundle', 'p4ChangeInspect', 'p4PathSyncCheck',
       'p4ConfigDetect'
     ];
     

@@ -185,7 +185,7 @@ The following npm scripts are configured for publishing:
 
 - **Recommendation**: Use the automated workflow (Method 2) for consistency and safety
 - Manual publishing (Method 1) is good for testing or when the automated pipeline isn't available
-- The package includes 47 MCP tools covering comprehensive Perforce operations
+- The package includes 55 MCP tools covering comprehensive Perforce operations
 - Enterprise-ready with SOC 2, GDPR, and HIPAA compliance features
 - Cross-platform support (Windows, macOS, Linux)
 

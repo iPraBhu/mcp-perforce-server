@@ -141,6 +141,13 @@ This document describes all available agents (tools) provided by the MCP Perforc
 - `workspacePath` (optional): Path to workspace directory  
 **Returns**: Line-by-line attribution showing who last changed each line
 
+#### `p4.annotate`
+**Description**: Alias for file annotations (`p4.blame`)  
+**Parameters**:
+- `file`: File to annotate
+- `workspacePath` (optional): Path to workspace directory  
+**Returns**: Line-by-line attribution showing who last changed each line
+
 ### Merge & Conflict Resolution
 
 #### `p4.resolve`
@@ -213,6 +220,74 @@ This document describes all available agents (tools) provided by the MCP Perforc
 - `status` (optional): Filter by status (pending, submitted, etc.)
 - `workspacePath` (optional): Path to workspace directory  
 **Returns**: List of changelists matching criteria
+
+#### `p4.review`
+**Description**: List changelists pending review  
+**Parameters**:
+- `counter` (optional): Review counter/token (`p4 review -t`)
+- `filespec` (optional): Filespec filter
+- `workspacePath` (optional): Path to workspace directory  
+**Returns**: List of pending changelists
+
+#### `p4.reviews`
+**Description**: List reviewers for files or a changelist  
+**Parameters**:
+- `changelist` (optional): Changelist to resolve reviewers for
+- `files` (optional): Files/filespecs to resolve reviewers for
+- `workspacePath` (optional): Path to workspace directory  
+**Returns**: List of matching reviewers
+
+#### `p4.interchanges`
+**Description**: List changelists not yet integrated between two paths  
+**Parameters**:
+- `sourcePath`: Source depot path/filespec
+- `targetPath`: Target depot path/filespec
+- `max` (optional): Maximum changelists to return
+- `longDescription` (optional): Include long descriptions (`-l`)
+- `workspacePath` (optional): Path to workspace directory  
+**Returns**: Changelists eligible for integration
+
+#### `p4.integrated`
+**Description**: Show integration history between source and target  
+**Parameters**:
+- `sourcePath`: Source depot path/filespec
+- `targetPath` (optional): Target depot path/filespec
+- `workspacePath` (optional): Path to workspace directory  
+**Returns**: Integration history records
+
+### Workflow Composites
+
+#### `p4.review.bundle`
+**Description**: Composite review helper that bundles pending review changelists with optional details and reviewers  
+**Parameters**:
+- `counter` (optional): Review counter/token for `p4 review -t`
+- `filespec` (optional): Filespec filter
+- `maxChanges` (optional): Maximum changelists to include
+- `includeDescribe` (optional): Include `p4.describe` details per changelist (default true)
+- `includeReviewers` (optional): Include `p4.reviews` reviewers per changelist (default true)
+- `workspacePath` (optional): Path to workspace directory  
+**Returns**: One bundled response containing summary, step status, and per-change review context
+
+#### `p4.change.inspect`
+**Description**: Composite changelist inspection for code review context  
+**Parameters**:
+- `changelist`: Changelist number to inspect
+- `includeFileHistory` (optional): Include `p4.filelog` for affected files
+- `maxFilesWithHistory` (optional): Max files to fetch history for
+- `maxRevisions` (optional): Max revisions per file history call
+- `workspacePath` (optional): Path to workspace directory  
+**Returns**: Aggregated describe/fixes/reviewers output (plus optional file history) in one response
+
+#### `p4.path.synccheck`
+**Description**: Composite path synchronization analysis between two depot paths  
+**Parameters**:
+- `sourcePath`: Source depot path/filespec
+- `targetPath`: Target depot path/filespec
+- `maxInterchanges` (optional): Max interchanges per direction
+- `includeIntegrated` (optional): Include `p4.integrated` history (default true)
+- `checkBothDirections` (optional): Analyze reverse direction too (default true)
+- `workspacePath` (optional): Path to workspace directory  
+**Returns**: Aggregated drift and sync-state summary plus forward/reverse step details
 
 ### Search & Discovery
 

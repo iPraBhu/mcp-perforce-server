@@ -9,6 +9,16 @@ MCP server for Perforce (P4) with safe defaults, fast execution, and structured 
 
 > Developed with vibe coding for practical Perforce automation workflows.
 
+New to MCP servers? See [What is MCP (Model Context Protocol)?](https://adevguide.com/ai-engineering/llm-agents/what-is-mcp-model-context-protocol/).
+
+## Workflow Speed
+
+This server includes composite tools that combine multiple Perforce calls into one request so review and sync workflows complete faster with fewer MCP round trips.
+
+- `p4.review.bundle`: pending review changelists with optional details and reviewers in one call
+- `p4.change.inspect`: changelist inspection bundle (`describe` + `fixes` + `reviews` + optional `filelog`)
+- `p4.path.synccheck`: branch/path sync drift analysis (`interchanges` + optional `integrated`)
+
 ## Install
 
 ```bash
@@ -138,7 +148,14 @@ Write-capable tools blocked when `P4_READONLY_MODE=true`:
 | `P4_CONFIG_CACHE_TTL` | `600000` / `300000` / `300000` | `.p4config` cache TTL in ms (`fast` / `balanced` / `secure`). |
 | `P4_RESPONSE_CACHE` | `true` | Enable/disable read-result response cache. |
 | `P4_RESPONSE_CACHE_TTL_MS` | `5000` / `3000` / `1000` | Response cache TTL in ms (`fast` / `balanced` / `secure`). |
+| `P4_RESPONSE_CACHE_TTL_MAP` | unset | Per-tool cache TTL overrides (for example `p4.info=30000,p4.review=2000`). |
 | `P4_RESPONSE_CACHE_MAX_ENTRIES` | `400` / `250` / `100` | Max cached read responses (`fast` / `balanced` / `secure`). |
+| `P4_NEGATIVE_CACHE` | `true` | Cache predictable read errors for a short TTL to avoid repeated retries. |
+| `P4_NEGATIVE_CACHE_TTL_MS` | `5000` | Negative-cache TTL in milliseconds. |
+| `P4_WORKFLOW_CONCURRENCY` | `6` | Max concurrent subcalls used by composite workflow tools. |
+| `P4_LOG_PERF_METRICS` | `false` | Enable periodic performance snapshots (cache hit rate, p50/p95 latency, subcall totals). |
+| `P4_LOG_PERF_METRICS_INTERVAL_MS` | `60000` | Interval for performance snapshot logs in milliseconds. |
+| `P4_PERF_METRICS_SAMPLE_SIZE` | `200` | Rolling sample size per tool used to compute p50/p95 latency. |
 | `P4_ENABLE_AUDIT_LOGGING` | `false` / `false` / `true` | Override audit logging (`fast` / `balanced` / `secure`). |
 | `P4_ENABLE_RATE_LIMITING` | `false` / `false` / `true` | Override rate limiting (`fast` / `balanced` / `secure`). |
 | `P4_ENABLE_MEMORY_LIMITS` | `false` / `true` / `true` | Override memory-limit checks (`fast` / `balanced` / `secure`). |
@@ -166,7 +183,8 @@ Write-capable tools blocked when `P4_READONLY_MODE=true`:
 
 ## Tool Coverage
 
-- 47 MCP tools covering repository info, file operations, changelists, merge/resolve, search, users/clients, jobs, labels/streams, analytics, and compliance.
+- 55 MCP tools covering repository info, file operations, changelists, merge/resolve, review workflows, workflow composites, search, users/clients, jobs, labels/streams, analytics, and compliance.
+- Composite workflow tools are included to reduce request count and speed up common review/sync flows.
 - Includes both:
   - `p4.diff` for workspace/local vs depot diff.
   - `p4.diff2` for depot-to-depot server-side diff.

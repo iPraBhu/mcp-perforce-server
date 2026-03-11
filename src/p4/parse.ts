@@ -156,6 +156,128 @@ export function parseChangesOutput(output: string | any): ParsedRecord[] {
 }
 
 /**
+ * Parse p4 review output into changelist records
+ */
+export function parseReviewOutput(output: string | any): ParsedRecord[] {
+  return parseInterchangesOutput(output);
+}
+
+/**
+ * Parse p4 reviews output into reviewer records
+ */
+export function parseReviewsOutput(output: string | any): ParsedRecord[] {
+  const results: ParsedRecord[] = [];
+
+  if (!output || typeof output !== 'string') {
+    return results;
+  }
+
+  const lines = getNormalizedLines(output, { trim: true, removeEmpty: true });
+
+  for (const line of lines) {
+    // Common format: "user <email> (Full Name)"
+    const withEmail = line.match(/^(\S+)\s+<([^>]+)>\s+\((.*?)\)(?:\s+(.*))?$/);
+    if (withEmail) {
+      const [, user, email, name, details] = withEmail;
+      results.push({
+        user,
+        email,
+        name,
+        details: details || undefined,
+      });
+      continue;
+    }
+
+    // Alternate format: "user (Full Name)"
+    const withNameOnly = line.match(/^(\S+)\s+\((.*?)\)(?:\s+(.*))?$/);
+    if (withNameOnly) {
+      const [, user, name, details] = withNameOnly;
+      results.push({
+        user,
+        name,
+        details: details || undefined,
+      });
+      continue;
+    }
+
+    // Fallback: preserve the raw line and first token as user
+    const tokenized = line.match(/^(\S+)(?:\s+(.*))?$/);
+    if (tokenized) {
+      const [, user, details] = tokenized;
+      results.push({
+        user,
+        details: details || undefined,
+        raw: line,
+      });
+    }
+  }
+
+  return results;
+}
+
+/**
+ * Parse p4 interchanges output into changelist records
+ */
+export function parseInterchangesOutput(output: string | any): ParsedRecord[] {
+  const results: ParsedRecord[] = [];
+
+  if (!output || typeof output !== 'string') {
+    return results;
+  }
+
+  const lines = getNormalizedLines(output);
+  let current: ParsedRecord | null = null;
+  let descriptionLines: string[] = [];
+
+  const finalizeCurrent = () => {
+    if (!current) {
+      return;
+    }
+    if (descriptionLines.length > 0) {
+      current.description = descriptionLines.join('\n').trim();
+    } else if (!current.description) {
+      current.description = '';
+    }
+    results.push(current);
+    current = null;
+    descriptionLines = [];
+  };
+
+  for (const rawLine of lines) {
+    const line = rawLine.trim();
+    if (!line) {
+      if (current && descriptionLines.length > 0) {
+        finalizeCurrent();
+      }
+      continue;
+    }
+
+    const headerMatch = line.match(
+      /^Change\s+(\d+)\s+on\s+(\S+)\s+by\s+(.+?)@(.+?)(?:\s+'(.*)')?$/
+    );
+    if (headerMatch) {
+      finalizeCurrent();
+      const [, change, date, user, client, description] = headerMatch;
+      current = {
+        change: parseInt(change, 10),
+        date,
+        user,
+        client,
+        description: description ? description.replace(/'/g, '') : '',
+      };
+      continue;
+    }
+
+    if (current) {
+      descriptionLines.push(line);
+    }
+  }
+
+  finalizeCurrent();
+  return results;
+}
+
+/**
  * Parse p4 filelog output into file history records
  */
 export function parseFilelogOutput(output: string | any): ParsedRecord[] {
@@ -1217,6 +1339,51 @@ export function parseIntegrateOutput(output: string | any): ParsedRecord[] {
           : undefined,
       });
     }
+  }
+
+  return results;
+}
+
+/**
+ * Parse p4 integrated output into integration records
+ */
+export function parseIntegratedOutput(output: string | any): ParsedRecord[] {
+  const parsed = parseIntegrateOutput(output);
+  if (parsed.length > 0) {
+    return parsed;
+  }
+
+  const results: ParsedRecord[] = [];
+  if (!output || typeof output !== 'string') {
+    return results;
+  }
+
+  const lines = getNormalizedLines(output, { trim: true, removeEmpty: true });
+  for (const line of lines) {
+    // Common format:
+    // //depot/target#5 - integrated from //depot/source#7
+    const match = line.match(
+      /^(.+?)#([^\s]+)\s+-\s+(.+?)(?:\s+(?:from|into|to)\s+(.+?)#([^\s]+))?$/
+    );
+    if (!match) {
+      continue;
+    }
+
+    const [, file, revisionRaw, action, relatedFile, relatedRevisionRaw] = match;
+    const revisionNum = parseInt(revisionRaw, 10);
+    const relatedRevisionNum = relatedRevisionRaw ? parseInt(relatedRevisionRaw, 10) : NaN;
+
+    results.push({
+      file,
+      revision: Number.isNaN(revisionNum) ? revisionRaw : revisionNum,
+      action: action.trim(),
+      relatedFile: relatedFile || undefined,
+      relatedRevision: relatedRevisionRaw
+        ? Number.isNaN(relatedRevisionNum)
+          ? relatedRevisionRaw
+          : relatedRevisionNum
+        : undefined,
+    });
   }
 
   return results;

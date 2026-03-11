@@ -37,6 +37,28 @@ interface ToolContext {
 
 type ToolHandler = (context: ToolContext, args: Record<string, unknown>) => Promise<unknown>;
 
+type CacheStatus = 'uncacheable' | 'hit' | 'negative_hit' | 'in_flight' | 'miss';
+
+interface CacheEntry {
+  value: unknown;
+  expiresAt: number;
+  isNegative: boolean;
+  ttlMs: number;
+}
+
+interface ToolPerformanceStats {
+  calls: number;
+  successes: number;
+  errors: number;
+  cacheHits: number;
+  negativeCacheHits: number;
+  cacheMisses: number;
+  inFlightHits: number;
+  totalDurationMs: number;
+  durationsMs: number[];
+  subcallTotals: Record<string, number>;
+}
+
 const TOOL_HANDLERS: Record<string, ToolHandler> = {
   'p4.info': tools.p4Info as ToolHandler,
   'p4.status': tools.p4Status as ToolHandler,
@@ -60,7 +82,15 @@ const TOOL_HANDLERS: Record<string, ToolHandler> = {
   'p4.shelve': tools.p4Shelve as ToolHandler,
   'p4.unshelve': tools.p4Unshelve as ToolHandler,
   'p4.changes': tools.p4Changes as ToolHandler,
+  'p4.review': tools.p4Review as ToolHandler,
+  'p4.reviews': tools.p4Reviews as ToolHandler,
+  'p4.interchanges': tools.p4Interchanges as ToolHandler,
+  'p4.integrated': tools.p4Integrated as ToolHandler,
+  'p4.review.bundle': tools.p4ReviewBundle as ToolHandler,
+  'p4.change.inspect': tools.p4ChangeInspect as ToolHandler,
+  'p4.path.synccheck': tools.p4PathSyncCheck as ToolHandler,
   'p4.blame': tools.p4Blame as ToolHandler,
+  'p4.annotate': tools.p4Annotate as ToolHandler,
   'p4.copy': tools.p4Copy as ToolHandler,
   'p4.move': tools.p4Move as ToolHandler,
   'p4.integrate': tools.p4Integrate as ToolHandler,
@@ -110,6 +140,35 @@ const CACHEABLE_TOOLS = new Set<string>(
   Object.keys(TOOL_HANDLERS).filter((toolName) => !WRITE_TOOLS.has(toolName))
 );
 
+const LOW_LATENCY_CACHE_TTL_TOOLS = new Set<string>([
+  'p4.status',
+  'p4.opened',
+  'p4.changes',
+  'p4.review',
+  'p4.reviews',
+  'p4.interchanges',
+  'p4.integrated',
+  'p4.review.bundle',
+  'p4.change.inspect',
+  'p4.path.synccheck',
+]);
+
+const STABLE_CACHE_TTL_TOOLS = new Set<string>([
+  'p4.info',
+  'p4.users',
+  'p4.user',
+  'p4.clients',
+  'p4.client',
+  'p4.labels',
+  'p4.label',
+  'p4.streams',
+  'p4.stream',
+  'p4.jobs',
+  'p4.job',
+  'p4.config.detect',
+  'p4.compliance',
+]);
+
 function getPerformanceMode(): 'fast' | 'balanced' | 'secure' {
   const mode = (process.env.P4_PERFORMANCE_MODE || 'fast').toLowerCase();
   if (mode === 'balanced' || mode === 'secure') {
@@ -147,6 +206,34 @@ function getEnvInt(name: string, fallback: number): number {
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
 }
 
+function parseToolCacheTtlOverrides(raw: string | undefined): Map<string, number> {
+  const overrides = new Map<string, number>();
+  if (!raw) {
+    return overrides;
+  }
+
+  for (const segment of raw.split(',')) {
+    const trimmed = segment.trim();
+    if (!trimmed) {
+      continue;
+    }
+
+    const splitIndex = trimmed.includes('=') ? trimmed.indexOf('=') : trimmed.indexOf(':');
+    if (splitIndex <= 0) {
+      continue;
+    }
+
+    const key = trimmed.slice(0, splitIndex).trim();
+    const valueRaw = trimmed.slice(splitIndex + 1).trim();
+    const value = parseInt(valueRaw, 10);
+    if (key && Number.isFinite(value) && value >= 0) {
+      overrides.set(key, value);
+    }
+  }
+
+  return overrides;
+}
+
 class MCPPerforceServer {
   private server: Server;
   private context: ToolContext;
@@ -157,8 +244,26 @@ class MCPPerforceServer {
     'P4_RESPONSE_CACHE_MAX_ENTRIES',
     getDefaultResponseCacheMaxEntries()
   );
-  private readonly responseCache = new Map<string, { value: unknown; expiresAt: number }>();
+  private readonly responseCacheTtlOverrides = parseToolCacheTtlOverrides(process.env.P4_RESPONSE_CACHE_TTL_MAP);
+  private readonly negativeCacheEnabled = process.env.P4_NEGATIVE_CACHE !== 'false';
+  private readonly negativeCacheTtlMs = getEnvInt(
+    'P4_NEGATIVE_CACHE_TTL_MS',
+    Math.max(1000, Math.min(this.responseCacheTtlMs, 5000))
+  );
+  private readonly negativeCacheableErrorCodes = new Set<string>([
+    'P4_INVALID_ARGS',
+    'P4_READONLY_MODE',
+    'P4_DELETE_DISABLED',
+    'P4_AUDIT_DISABLED',
+    'P4_CONFIG_NOT_FOUND',
+  ]);
+  private readonly responseCache = new Map<string, CacheEntry>();
   private readonly inFlightReadRequests = new Map<string, Promise<unknown>>();
+  private readonly toolPerformance = new Map<string, ToolPerformanceStats>();
+  private readonly perfMetricsSampleSize = getEnvInt('P4_PERF_METRICS_SAMPLE_SIZE', 200) || 200;
+  private readonly perfMetricsEnabled = process.env.P4_LOG_PERF_METRICS === 'true';
+  private readonly perfMetricsIntervalMs = getEnvInt('P4_LOG_PERF_METRICS_INTERVAL_MS', 60000) || 60000;
+  private perfMetricsTimer: NodeJS.Timeout | null = null;
   private cacheEpoch = 0;
 
   constructor() {
@@ -183,6 +288,7 @@ class MCPPerforceServer {
 
     this.setupToolHandlers();
     this.setupErrorHandling();
+    this.setupPerformanceLogging();
   }
 
   private setupErrorHandling(): void {
@@ -192,15 +298,39 @@ class MCPPerforceServer {
 
     process.on('SIGINT', async () => {
       log.info('Shutting down MCP Perforce server...');
+      this.stopPerformanceLogging();
       await this.server.close();
       process.exit(0);
     });
 
     process.on('SIGTERM', async () => {
       log.info('Shutting down MCP Perforce server...');
+      this.stopPerformanceLogging();
       await this.server.close();
       process.exit(0);
     });
+  }
+
+  private setupPerformanceLogging(): void {
+    if (!this.perfMetricsEnabled || this.perfMetricsIntervalMs <= 0) {
+      return;
+    }
+
+    this.perfMetricsTimer = setInterval(() => {
+      this.logPerformanceSnapshot();
+    }, this.perfMetricsIntervalMs);
+
+    if (typeof this.perfMetricsTimer.unref === 'function') {
+      this.perfMetricsTimer.unref();
+    }
+  }
+
+  private stopPerformanceLogging(): void {
+    if (!this.perfMetricsTimer) {
+      return;
+    }
+    clearInterval(this.perfMetricsTimer);
+    this.perfMetricsTimer = null;
   }
 
   private serializeResult(value: unknown): string {
@@ -216,7 +346,22 @@ class MCPPerforceServer {
     };
   }
 
-  private getCachedResult(cacheKey: string): unknown | undefined {
+  private getToolCacheTtlMs(toolName: string): number {
+    const override = this.responseCacheTtlOverrides.get(toolName);
+    if (override !== undefined) {
+      return override;
+    }
+
+    if (LOW_LATENCY_CACHE_TTL_TOOLS.has(toolName)) {
+      return Math.max(1000, Math.floor(this.responseCacheTtlMs / 2));
+    }
+    if (STABLE_CACHE_TTL_TOOLS.has(toolName)) {
+      return Math.max(this.responseCacheTtlMs, 15000);
+    }
+    return this.responseCacheTtlMs;
+  }
+
+  private getCachedResult(cacheKey: string): { result: unknown; cacheStatus: CacheStatus } | undefined {
     const entry = this.responseCache.get(cacheKey);
     if (!entry) {
       return undefined;
@@ -227,24 +372,38 @@ class MCPPerforceServer {
       return undefined;
     }
 
-    return entry.value;
+    // LRU behavior: refresh recency on read hits.
+    this.responseCache.delete(cacheKey);
+    this.responseCache.set(cacheKey, entry);
+
+    return {
+      result: entry.value,
+      cacheStatus: entry.isNegative ? 'negative_hit' : 'hit',
+    };
   }
 
-  private setCachedResult(cacheKey: string, value: unknown): void {
-    if (this.responseCacheMaxEntries <= 0 || this.responseCacheTtlMs <= 0) {
+  private setCachedResult(cacheKey: string, value: unknown, ttlMs: number, isNegative = false): void {
+    if (this.responseCacheMaxEntries <= 0 || ttlMs <= 0) {
       return;
     }
 
-    if (this.responseCache.size >= this.responseCacheMaxEntries) {
+    if (this.responseCache.has(cacheKey)) {
+      this.responseCache.delete(cacheKey);
+    }
+
+    while (this.responseCache.size >= this.responseCacheMaxEntries) {
       const oldestKey = this.responseCache.keys().next().value;
-      if (oldestKey) {
-        this.responseCache.delete(oldestKey);
+      if (!oldestKey) {
+        break;
       }
+      this.responseCache.delete(oldestKey);
     }
 
     this.responseCache.set(cacheKey, {
       value,
-      expiresAt: Date.now() + this.responseCacheTtlMs,
+      expiresAt: Date.now() + ttlMs,
+      isNegative,
+      ttlMs,
     });
   }
 
@@ -259,6 +418,136 @@ class MCPPerforceServer {
     return `${name}:${JSON.stringify(args ?? {})}`;
   }
 
+  private shouldCacheNegativeResult(result: unknown): boolean {
+    if (!this.negativeCacheEnabled || !result || typeof result !== 'object') {
+      return false;
+    }
+
+    const resultRecord = result as { ok?: boolean; error?: { code?: string } };
+    if (resultRecord.ok !== false) {
+      return false;
+    }
+
+    const errorCode = resultRecord.error?.code;
+    return typeof errorCode === 'string' && this.negativeCacheableErrorCodes.has(errorCode);
+  }
+
+  private recordToolPerformance(
+    toolName: string,
+    durationMs: number,
+    result: unknown,
+    cacheStatus: CacheStatus,
+    subcallCounts?: Record<string, number>
+  ): void {
+    let stats = this.toolPerformance.get(toolName);
+    if (!stats) {
+      stats = {
+        calls: 0,
+        successes: 0,
+        errors: 0,
+        cacheHits: 0,
+        negativeCacheHits: 0,
+        cacheMisses: 0,
+        inFlightHits: 0,
+        totalDurationMs: 0,
+        durationsMs: [],
+        subcallTotals: {},
+      };
+      this.toolPerformance.set(toolName, stats);
+    }
+
+    stats.calls += 1;
+    stats.totalDurationMs += durationMs;
+    stats.durationsMs.push(durationMs);
+    if (stats.durationsMs.length > this.perfMetricsSampleSize) {
+      stats.durationsMs.shift();
+    }
+
+    const ok = !!(result && typeof result === 'object' && (result as { ok?: boolean }).ok === true);
+    if (ok) {
+      stats.successes += 1;
+    } else {
+      stats.errors += 1;
+    }
+
+    switch (cacheStatus) {
+      case 'hit':
+        stats.cacheHits += 1;
+        break;
+      case 'negative_hit':
+        stats.negativeCacheHits += 1;
+        break;
+      case 'in_flight':
+        stats.inFlightHits += 1;
+        break;
+      case 'miss':
+        stats.cacheMisses += 1;
+        break;
+      default:
+        break;
+    }
+
+    if (subcallCounts) {
+      for (const [name, value] of Object.entries(subcallCounts)) {
+        if (!Number.isFinite(value) || value <= 0) {
+          continue;
+        }
+        stats.subcallTotals[name] = (stats.subcallTotals[name] || 0) + value;
+      }
+    }
+  }
+
+  private getPercentile(samples: number[], percentile: number): number {
+    if (samples.length === 0) {
+      return 0;
+    }
+    const sorted = [...samples].sort((a, b) => a - b);
+    const index = Math.min(
+      sorted.length - 1,
+      Math.max(0, Math.floor((percentile / 100) * (sorted.length - 1)))
+    );
+    return Math.round(sorted[index]);
+  }
+
+  private extractSubcallCounts(result: unknown): Record<string, number> | undefined {
+    if (!result || typeof result !== 'object') {
+      return undefined;
+    }
+    const outer = result as { result?: unknown };
+    if (!outer.result || typeof outer.result !== 'object') {
+      return undefined;
+    }
+    const meta = (outer.result as { meta?: { subcallCounts?: Record<string, number> } }).meta;
+    if (!meta || !meta.subcallCounts) {
+      return undefined;
+    }
+    return meta.subcallCounts;
+  }
+
+  private logPerformanceSnapshot(): void {
+    if (this.toolPerformance.size === 0) {
+      return;
+    }
+
+    const byCalls = [...this.toolPerformance.entries()].sort((a, b) => b[1].calls - a[1].calls);
+    const topEntries = byCalls.slice(0, 12).map(([toolName, stats]) => {
+      const cacheHitsTotal = stats.cacheHits + stats.negativeCacheHits + stats.inFlightHits;
+      const cacheHitRate = stats.calls > 0 ? Math.round((cacheHitsTotal / stats.calls) * 100) : 0;
+      const avgMs = stats.calls > 0 ? Math.round(stats.totalDurationMs / stats.calls) : 0;
+      return {
+        tool: toolName,
+        calls: stats.calls,
+        avgMs,
+        p50Ms: this.getPercentile(stats.durationsMs, 50),
+        p95Ms: this.getPercentile(stats.durationsMs, 95),
+        cacheHitRate,
+        subcalls: stats.subcallTotals,
+      };
+    });
+
+    log.info('Performance snapshot:', topEntries);
+  }
+
   private async executeTool(name: string, args: Record<string, unknown>): Promise<unknown> {
     const handler = TOOL_HANDLERS[name];
     if (!handler) {
@@ -268,20 +557,23 @@ class MCPPerforceServer {
     return handler(this.context, args);
   }
 
-  private async executeToolWithCaching(name: string, args: Record<string, unknown>): Promise<unknown> {
+  private async executeToolWithCaching(
+    name: string,
+    args: Record<string, unknown>
+  ): Promise<{ result: unknown; cacheStatus: CacheStatus }> {
     if (!this.responseCacheEnabled || !CACHEABLE_TOOLS.has(name)) {
-      return this.executeTool(name, args);
+      return { result: await this.executeTool(name, args), cacheStatus: 'uncacheable' };
     }
 
     const cacheKey = this.buildCacheKey(name, args);
     const cachedResult = this.getCachedResult(cacheKey);
-    if (cachedResult !== undefined) {
+    if (cachedResult) {
       return cachedResult;
     }
 
     const inFlight = this.inFlightReadRequests.get(cacheKey);
     if (inFlight) {
-      return inFlight;
+      return { result: await inFlight, cacheStatus: 'in_flight' };
     }
 
     const pending = this.executeTool(name, args);
@@ -291,14 +583,17 @@ class MCPPerforceServer {
     try {
       const result = await pending;
       if (
-        startedEpoch === this.cacheEpoch &&
-        result &&
-        typeof result === 'object' &&
-        (result as { ok?: boolean }).ok === true
+        startedEpoch === this.cacheEpoch
       ) {
-        this.setCachedResult(cacheKey, result);
+        const toolTtlMs = this.getToolCacheTtlMs(name);
+        if (result && typeof result === 'object' && (result as { ok?: boolean }).ok === true) {
+          this.setCachedResult(cacheKey, result, toolTtlMs, false);
+        } else if (this.shouldCacheNegativeResult(result)) {
+          const negativeTtl = Math.min(toolTtlMs, this.negativeCacheTtlMs);
+          this.setCachedResult(cacheKey, result, negativeTtl, true);
+        }
       }
-      return result;
+      return { result, cacheStatus: 'miss' };
     } finally {
       this.inFlightReadRequests.delete(cacheKey);
     }
@@ -826,6 +1121,205 @@ class MCPPerforceServer {
             },
           },
           {
+            name: 'p4.review',
+            description: 'List changelists pending review',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                counter: {
+                  type: 'string',
+                  description: 'Review counter/token used by p4 review -t (optional)',
+                },
+                filespec: {
+                  type: 'string',
+                  description: 'Optional filespec to filter changelists',
+                },
+                workspacePath: {
+                  type: 'string',
+                  description: 'Path to workspace directory (optional, defaults to current directory)',
+                },
+              },
+              additionalProperties: false,
+            },
+          },
+          {
+            name: 'p4.reviews',
+            description: 'List reviewers for files or a changelist',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                changelist: {
+                  type: 'string',
+                  description: 'Optional changelist number to resolve reviewers for',
+                },
+                files: {
+                  type: 'array',
+                  items: { type: 'string' },
+                  description: 'Optional file list/filespecs to resolve reviewers for',
+                },
+                workspacePath: {
+                  type: 'string',
+                  description: 'Path to workspace directory (optional, defaults to current directory)',
+                },
+              },
+              additionalProperties: false,
+            },
+          },
+          {
+            name: 'p4.interchanges',
+            description: 'List changelists not yet integrated between two paths',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                sourcePath: {
+                  type: 'string',
+                  description: 'Source depot filespec/path (required)',
+                },
+                targetPath: {
+                  type: 'string',
+                  description: 'Target depot filespec/path (required)',
+                },
+                max: {
+                  type: 'number',
+                  description: 'Maximum number of changelists to return (optional)',
+                },
+                longDescription: {
+                  type: 'boolean',
+                  description: 'Include long descriptions (optional, equivalent to -l)',
+                },
+                workspacePath: {
+                  type: 'string',
+                  description: 'Path to workspace directory (optional, defaults to current directory)',
+                },
+              },
+              required: ['sourcePath', 'targetPath'],
+              additionalProperties: false,
+            },
+          },
+          {
+            name: 'p4.integrated',
+            description: 'Show integration history for source/target paths',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                sourcePath: {
+                  type: 'string',
+                  description: 'Source depot filespec/path (required)',
+                },
+                targetPath: {
+                  type: 'string',
+                  description: 'Optional target depot filespec/path',
+                },
+                workspacePath: {
+                  type: 'string',
+                  description: 'Path to workspace directory (optional, defaults to current directory)',
+                },
+              },
+              required: ['sourcePath'],
+              additionalProperties: false,
+            },
+          },
+          {
+            name: 'p4.review.bundle',
+            description: 'Composite review workflow: pending changes with optional details/reviewers',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                counter: {
+                  type: 'string',
+                  description: 'Optional review counter/token for p4 review -t',
+                },
+                filespec: {
+                  type: 'string',
+                  description: 'Optional filespec filter',
+                },
+                maxChanges: {
+                  type: 'number',
+                  description: 'Maximum changelists to include (optional, default 10)',
+                },
+                includeDescribe: {
+                  type: 'boolean',
+                  description: 'Include p4 describe data per changelist (optional, default true)',
+                },
+                includeReviewers: {
+                  type: 'boolean',
+                  description: 'Include p4 reviews per changelist (optional, default true)',
+                },
+                workspacePath: {
+                  type: 'string',
+                  description: 'Path to workspace directory (optional, defaults to current directory)',
+                },
+              },
+              additionalProperties: false,
+            },
+          },
+          {
+            name: 'p4.change.inspect',
+            description: 'Composite changelist inspection: describe + fixes + reviewers (+ optional file history)',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                changelist: {
+                  type: 'string',
+                  description: 'Changelist number to inspect (required)',
+                },
+                includeFileHistory: {
+                  type: 'boolean',
+                  description: 'Include p4 filelog for affected files (optional, default false)',
+                },
+                maxFilesWithHistory: {
+                  type: 'number',
+                  description: 'Maximum files to fetch filelog for (optional, default 5)',
+                },
+                maxRevisions: {
+                  type: 'number',
+                  description: 'Maximum revisions per filelog call (optional, default 5)',
+                },
+                workspacePath: {
+                  type: 'string',
+                  description: 'Path to workspace directory (optional, defaults to current directory)',
+                },
+              },
+              required: ['changelist'],
+              additionalProperties: false,
+            },
+          },
+          {
+            name: 'p4.path.synccheck',
+            description: 'Composite path sync analysis using interchanges/integrated in one call',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                sourcePath: {
+                  type: 'string',
+                  description: 'Source depot filespec/path (required)',
+                },
+                targetPath: {
+                  type: 'string',
+                  description: 'Target depot filespec/path (required)',
+                },
+                maxInterchanges: {
+                  type: 'number',
+                  description: 'Maximum interchanges per direction (optional, default 50)',
+                },
+                includeIntegrated: {
+                  type: 'boolean',
+                  description: 'Include p4 integrated history (optional, default true)',
+                },
+                checkBothDirections: {
+                  type: 'boolean',
+                  description: 'Run reverse-direction comparison too (optional, default true)',
+                },
+                workspacePath: {
+                  type: 'string',
+                  description: 'Path to workspace directory (optional, defaults to current directory)',
+                },
+              },
+              required: ['sourcePath', 'targetPath'],
+              additionalProperties: false,
+            },
+          },
+          {
             name: 'p4.blame',
             description: 'Show file annotations with change history (like git blame)',
             inputSchema: {
@@ -834,6 +1328,25 @@ class MCPPerforceServer {
                 file: {
                   type: 'string',
                   description: 'File to show blame for (required)',
+                },
+                workspacePath: {
+                  type: 'string',
+                  description: 'Path to workspace directory (optional, defaults to current directory)',
+                },
+              },
+              required: ['file'],
+              additionalProperties: false,
+            },
+          },
+          {
+            name: 'p4.annotate',
+            description: 'Alias of p4.blame (line-by-line annotation)',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                file: {
+                  type: 'string',
+                  description: 'File to annotate (required)',
                 },
                 workspacePath: {
                   type: 'string',
@@ -1424,11 +1937,20 @@ class MCPPerforceServer {
         }
 
         const toolArgs = (args || {}) as Record<string, unknown>;
-        const result = await this.executeToolWithCaching(name, toolArgs);
+        const execution = await this.executeToolWithCaching(name, toolArgs);
+        const result = execution.result;
 
         if (WRITE_TOOLS.has(name) && result && typeof result === 'object' && (result as { ok?: boolean }).ok) {
           this.clearReadCache();
         }
+
+        this.recordToolPerformance(
+          name,
+          Date.now() - startTime,
+          result,
+          execution.cacheStatus,
+          this.extractSubcallCounts(result)
+        );
 
         // Audit log successful operation
         this.context.security.logAuditEntry({
@@ -1446,6 +1968,13 @@ class MCPPerforceServer {
       } catch (error) {
         const duration = Date.now() - startTime;
         const errorCode = error instanceof McpError ? error.code : 'INTERNAL_ERROR';
+
+        this.recordToolPerformance(
+          name,
+          duration,
+          { ok: false, error: { code: String(errorCode) } },
+          'uncacheable'
+        );
 
         log.error('Tool execution error:', error);
 
@@ -1511,7 +2040,14 @@ Environment Variables:
   P4_PRETTY_JSON=true         Pretty-print JSON responses (default: compact JSON)
   P4_RESPONSE_CACHE=false     Disable read-result cache (default: enabled)
   P4_RESPONSE_CACHE_TTL_MS=5000 Cache TTL in ms (default by mode: fast 5000, balanced 3000, secure 1000)
+  P4_RESPONSE_CACHE_TTL_MAP='p4.info=30000,p4.review=2000' Per-tool TTL overrides
   P4_RESPONSE_CACHE_MAX_ENTRIES=400 Max cached responses (default by mode)
+  P4_NEGATIVE_CACHE=false     Disable short-lived caching of predictable read errors
+  P4_NEGATIVE_CACHE_TTL_MS=5000 Negative-cache TTL in ms
+  P4_WORKFLOW_CONCURRENCY=6   Max concurrent subcalls in composite workflow tools
+  P4_LOG_PERF_METRICS=true    Enable periodic performance snapshot logs
+  P4_LOG_PERF_METRICS_INTERVAL_MS=60000 Performance snapshot interval in ms
+  P4_PERF_METRICS_SAMPLE_SIZE=200 Duration sample size per tool for p50/p95
 
 Compliance & Security:
   P4_ENABLE_AUDIT_LOGGING=true|false   Override audit logging (default in fast mode: false)

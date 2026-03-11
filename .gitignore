@@ -4,6 +4,10 @@ dist/
 .DS_Store
 .vscode/
 .env
+.env.*
 .p4config.test
+.p4config
+.p4tickets
+.p4tickets.*
 temp/
 *.tmp

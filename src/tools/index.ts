@@ -18,7 +18,12 @@ export {
   p4Shelve,
   p4Unshelve,
   p4Changes,
+  p4Review,
+  p4Reviews,
+  p4Interchanges,
+  p4Integrated,
   p4Blame,
+  p4Annotate,
   p4Copy,
   p4Move,
   p4Integrate,
@@ -44,6 +49,12 @@ export {
   p4Filelog,
   p4ConfigDetect
 } from './utils.js';
+
+export {
+  p4ReviewBundle,
+  p4ChangeInspect,
+  p4PathSyncCheck,
+} from './workflows.js';
 
 // Export advanced functions
 export {
