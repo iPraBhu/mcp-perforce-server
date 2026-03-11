@@ -13,6 +13,10 @@ function getDefaultConfigCacheTtl(): string {
   }
 }
 
+function isExplicitFalse(value?: string): boolean {
+  return typeof value === 'string' && value.trim().toLowerCase() === 'false';
+}
+
 export interface P4ConfigResult {
   found: boolean;
   configPath?: string;
@@ -254,8 +258,8 @@ export class P4Config {
    */
   getServerConfig(): P4ServerConfig {
     return {
-      readOnlyMode: process.env.P4_READONLY_MODE !== 'false', // Default: true
-      disableDelete: process.env.P4_DISABLE_DELETE !== 'false', // Default: true
+      readOnlyMode: !isExplicitFalse(process.env.P4_READONLY_MODE), // Default: true
+      disableDelete: !isExplicitFalse(process.env.P4_DISABLE_DELETE), // Default: true
     };
   }
   

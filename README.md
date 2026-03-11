@@ -30,7 +30,32 @@ P4CLIENT=your-workspace-name
 P4PASSWD=your-password
 ```
 
-### Global Install MCP Config (Read-Only Profile)
+### Global Install MCP Config (Default Safe Profile)
+
+```json
+{
+  "mcpServers": {
+    "perforce": {
+      "command": "mcp-perforce-server"
+    }
+  }
+}
+```
+
+### Local Repo MCP Config (Default Safe Profile)
+
+```json
+{
+  "mcpServers": {
+    "perforce": {
+      "command": "node",
+      "args": ["/absolute/path/to/mcp-perforce-server/dist/server.js"]
+    }
+  }
+}
+```
+
+### MCP Config (Default Safe Profile + Credentials in `env`)
 
 ```json
 {
@@ -38,23 +63,25 @@ P4PASSWD=your-password
     "perforce": {
       "command": "mcp-perforce-server",
       "env": {
-        "P4_READONLY_MODE": "true",
-        "P4_DISABLE_DELETE": "true",
-        "LOG_LEVEL": "error"
+        "P4PORT": "ssl:perforce.example.com:1666",
+        "P4USER": "your-username",
+        "P4CLIENT": "your-workspace-name",
+        "P4PASSWD": "your-password-or-ticket"
       }
     }
   }
 }
 ```
 
-### Local Repo MCP Config (Read-Only Profile)
+Defaults are already safe: `P4_READONLY_MODE=true` and `P4_DISABLE_DELETE=true` unless explicitly set to `false`.
+
+If you want to pin these explicitly in your client config:
 
 ```json
 {
   "mcpServers": {
     "perforce": {
-      "command": "node",
-      "args": ["/absolute/path/to/mcp-perforce-server/dist/server.js"],
+      "command": "mcp-perforce-server",
       "env": {
         "P4_READONLY_MODE": "true",
         "P4_DISABLE_DELETE": "true",
