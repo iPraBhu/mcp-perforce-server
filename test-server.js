@@ -102,6 +102,24 @@ async function testComponents() {
       console.error('[TEST] âœ— parseDescribeOutput failed');
     }
 
+    const parsedDescribeWithDiff = parse.parseDescribeOutput(
+      'info1: Change 124 by user@client on 2026/03/03 10:00:00\n' +
+      'info1: \tFix with diff\n' +
+      'info1: Affected files ...\n' +
+      'info1: ... //depot/main/file.txt#8 edit\n' +
+      'info1: Differences ...\n' +
+      'info1: ==== //depot/main/file.txt#8 - C:\\\\ws\\\\file.txt ====\n' +
+      'info1: @@ -1,1 +1,1 @@\n' +
+      'info1: -old line\n' +
+      'info1: +new line\n' +
+      'exit: 0\n'
+    );
+    if (parsedDescribeWithDiff.hasDiff === true) {
+      console.error('[TEST] âœ“ parseDescribeOutput captures describe diff content');
+    } else {
+      console.error('[TEST] âœ— parseDescribeOutput did not capture diff content');
+    }
+
     const parsedDiff2 = parse.parseDiff2Output(
       'info1: ==== //depot/main/file.txt#7 - //depot/release/file.txt#5 ==== content\n' +
       'exit: 0\n',

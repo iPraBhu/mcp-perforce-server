@@ -205,11 +205,13 @@ This document describes all available agents (tools) provided by the MCP Perforc
 **Returns**: Submission results
 
 #### `p4.describe`
-**Description**: Get detailed changelist information (equivalent to `p4 describe -s`)  
+**Description**: Get detailed changelist information (equivalent to `p4 describe -s` or `p4 describe -d<format>`)  
 **Parameters**:
 - `changelist`: Changelist number to describe (string or number)
+- `includeDiff` (optional): Include diff content from `p4 describe -d*`
+- `diffFormat` (optional): Diff format (`u`, `c`, `n`, `s`) when `includeDiff=true`
 - `workspacePath` (optional): Path to workspace directory  
-**Returns**: Complete changelist details including change metadata, description text, and affected files with revision/action
+**Returns**: Complete changelist details including metadata, description, affected files, and optional diff content
 
 #### `p4.changes`
 **Description**: List changelists with filtering  
@@ -272,6 +274,8 @@ This document describes all available agents (tools) provided by the MCP Perforc
 **Description**: Composite changelist inspection for code review context  
 **Parameters**:
 - `changelist`: Changelist number to inspect
+- `includeDiff` (optional): Include `p4.describe` diff content in the inspection response
+- `diffFormat` (optional): Diff format (`u`, `c`, `n`, `s`) for describe output
 - `includeFileHistory` (optional): Include `p4.filelog` for affected files
 - `maxFilesWithHistory` (optional): Max files to fetch history for
 - `maxRevisions` (optional): Max revisions per file history call

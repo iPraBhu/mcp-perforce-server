@@ -439,7 +439,12 @@ export async function p4Submit(
  */
 export async function p4Describe(
   context: ToolContext,
-  args: { changelist: string | number; workspacePath?: string }
+  args: {
+    changelist: string | number;
+    includeDiff?: boolean;
+    diffFormat?: 'u' | 'c' | 'n' | 's';
+    workspacePath?: string;
+  }
 ): Promise<P4RunResult> {
   if (args.changelist === undefined || args.changelist === null) {
     return {
@@ -469,10 +474,31 @@ export async function p4Describe(
       },
     };
   }
+
+  if (
+    args.diffFormat !== undefined &&
+    !['u', 'c', 'n', 's'].includes(args.diffFormat)
+  ) {
+    return {
+      ok: false,
+      command: 'describe',
+      args: [],
+      cwd: process.cwd(),
+      configUsed: {},
+      error: {
+        code: 'P4_INVALID_ARGS',
+        message: 'diffFormat must be one of: u, c, n, s',
+      },
+    };
+  }
   
   const { cwd, env, configResult } = await context.config.setupForCommand(args.workspacePath);
-  
-  const result = await context.runner.run('describe', ['-s', changelist], cwd, {
+
+  const includeDiff = args.includeDiff === true;
+  const diffFormat = args.diffFormat || 'u';
+  const describeArgs = includeDiff ? [`-d${diffFormat}`, changelist] : ['-s', changelist];
+
+  const result = await context.runner.run('describe', describeArgs, cwd, {
     env,
     useZtag: false,
     parseOutput: false,
@@ -492,6 +518,7 @@ export async function p4Describe(
       description: '',
       files: [],
       fileCount: 0,
+      hasDiff: false,
       rawText: '',
     };
   }

@@ -16,8 +16,13 @@ New to MCP servers? See [What is MCP (Model Context Protocol)?](https://adevguid
 This server includes composite tools that combine multiple Perforce calls into one request so review and sync workflows complete faster with fewer MCP round trips.
 
 - `p4.review.bundle`: pending review changelists with optional details and reviewers in one call
-- `p4.change.inspect`: changelist inspection bundle (`describe` + `fixes` + `reviews` + optional `filelog`)
+- `p4.change.inspect`: changelist inspection bundle (`describe` + `fixes` + `reviews` + optional diff + optional `filelog`)
 - `p4.path.synccheck`: branch/path sync drift analysis (`interchanges` + optional `integrated`)
+
+To return actual changelist diff content via MCP:
+
+- `p4.describe` with `includeDiff=true` (optional `diffFormat`: `u`, `c`, `n`, `s`)
+- `p4.change.inspect` with `includeDiff=true`
 
 ## Install
 

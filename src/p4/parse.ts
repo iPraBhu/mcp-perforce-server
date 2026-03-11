@@ -3,7 +3,7 @@
  */
 
 export interface ParsedRecord {
-  [key: string]: string | number | boolean | undefined | ParsedRecord[];
+  [key: string]: string | number | boolean | undefined | ParsedRecord | ParsedRecord[];
 }
 
 /**
@@ -535,13 +535,14 @@ export function parseDiff2Output(output: string | any, summaryOnly = true): Pars
 }
 
 /**
- * Parse p4 describe -s output into structured changelist data
+ * Parse p4 describe output into structured changelist data
  */
 export function parseDescribeOutput(output: string | any): ParsedRecord {
   const result: ParsedRecord = {
     files: [],
     description: '',
     rawText: '',
+    hasDiff: false,
   };
 
   if (!output || typeof output !== 'string') {
@@ -556,8 +557,10 @@ export function parseDescribeOutput(output: string | any): ParsedRecord {
 
   let inDescription = false;
   let inFiles = false;
+  let inDifferences = false;
   const descriptionLines: string[] = [];
   const files: ParsedRecord[] = [];
+  const diffLines: string[] = [];
 
   for (const line of lines) {
     const trimmed = line.trim();
@@ -587,12 +590,19 @@ export function parseDescribeOutput(output: string | any): ParsedRecord {
     if (/^Affected files\s+\.\.\.$/i.test(trimmed)) {
       inDescription = false;
       inFiles = true;
+      inDifferences = false;
       continue;
     }
 
     if (/^Differences\s+\.\.\.$/i.test(trimmed)) {
       inDescription = false;
       inFiles = false;
+      inDifferences = true;
+      continue;
+    }
+
+    if (inDifferences) {
+      diffLines.push(line);
       continue;
     }
 
@@ -623,6 +633,13 @@ export function parseDescribeOutput(output: string | any): ParsedRecord {
   result.description = descriptionLines.join('\n');
   result.files = files;
   result.fileCount = files.length;
+
+  const diffText = diffLines.join('\n').trim();
+  if (diffText.length > 0) {
+    result.hasDiff = true;
+    result.diffText = diffText;
+    result.diff = parseDiffOutput(diffText);
+  }
 
   return result;
 }

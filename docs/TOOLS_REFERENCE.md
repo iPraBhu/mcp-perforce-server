@@ -160,9 +160,9 @@ Diff behavior:
 
 ### `p4.describe`
 - Purpose: Describe changelist details.
-- Parameters: `changelist` (required string or number), `workspacePath?`
-- CLI equivalent: `p4 describe -s <changelist>`
-- Result details include: change metadata, description text, affected files, and actions.
+- Parameters: `changelist` (required string or number), `includeDiff?`, `diffFormat?` (`u` | `c` | `n` | `s`), `workspacePath?`
+- CLI equivalent: `p4 describe -s <changelist>` or `p4 describe -d<format> <changelist>`
+- Result details include: change metadata, description text, affected files/actions, and optional diff content when `includeDiff=true`.
 
 ### `p4.changes`
 - Purpose: List changelists with filters.
@@ -198,7 +198,7 @@ Diff behavior:
 
 ### `p4.change.inspect`
 - Purpose: Composite changelist inspector combining `p4.describe`, `p4.fixes`, `p4.reviews`, and optional `p4.filelog`.
-- Parameters: `changelist` (required), `includeFileHistory?`, `maxFilesWithHistory?`, `maxRevisions?`, `workspacePath?`
+- Parameters: `changelist` (required), `includeDiff?`, `diffFormat?`, `includeFileHistory?`, `maxFilesWithHistory?`, `maxRevisions?`, `workspacePath?`
 - Notes: Designed for one-shot code review context on a specific changelist.
 
 ### `p4.path.synccheck`

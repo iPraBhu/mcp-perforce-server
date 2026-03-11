@@ -223,6 +223,8 @@ export async function p4ChangeInspect(
   context: ToolContext,
   args: {
     changelist: string;
+    includeDiff?: boolean;
+    diffFormat?: 'u' | 'c' | 'n' | 's';
     includeFileHistory?: boolean;
     maxFilesWithHistory?: number;
     maxRevisions?: number;
@@ -249,7 +251,12 @@ export async function p4ChangeInspect(
   const maxRevisions = Math.max(1, Math.min(args.maxRevisions || 5, 50));
 
   const [describeResult, fixesResult, reviewersResult] = await Promise.all([
-    p4Describe(context, { changelist: args.changelist, workspacePath: args.workspacePath }),
+    p4Describe(context, {
+      changelist: args.changelist,
+      includeDiff: args.includeDiff,
+      diffFormat: args.diffFormat,
+      workspacePath: args.workspacePath,
+    }),
     p4Fixes(context, { changelist: args.changelist, workspacePath: args.workspacePath }),
     p4Reviews(context, { changelist: args.changelist, workspacePath: args.workspacePath }),
   ]);
@@ -341,6 +348,10 @@ export async function p4ChangeInspect(
         fileCount: files.length,
         fixesCount: getArrayResult(fixesResult.result).length,
         reviewerCount: getArrayResult(reviewersResult.result).length,
+        hasDiff:
+          typeof describeData.hasDiff === 'boolean'
+            ? describeData.hasDiff
+            : false,
         includeFileHistory,
       },
       meta: {

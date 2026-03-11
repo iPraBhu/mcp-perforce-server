@@ -921,7 +921,7 @@ class MCPPerforceServer {
           },
           {
             name: 'p4.describe',
-            description: 'Describe a changelist with metadata and affected files (equivalent to p4 describe -s)',
+            description: 'Describe a changelist with metadata, affected files, and optional diff content',
             inputSchema: {
               type: 'object',
               properties: {
@@ -931,6 +931,15 @@ class MCPPerforceServer {
                     { type: 'number' },
                   ],
                   description: 'Changelist number (required)',
+                },
+                includeDiff: {
+                  type: 'boolean',
+                  description: 'Include patch/diff content from p4 describe -d* (optional, default false)',
+                },
+                diffFormat: {
+                  type: 'string',
+                  enum: ['u', 'c', 'n', 's'],
+                  description: 'Diff format when includeDiff=true: u=unified, c=context, n=RCS, s=summary',
                 },
                 workspacePath: {
                   type: 'string',
@@ -1262,6 +1271,15 @@ class MCPPerforceServer {
                 changelist: {
                   type: 'string',
                   description: 'Changelist number to inspect (required)',
+                },
+                includeDiff: {
+                  type: 'boolean',
+                  description: 'Include describe diff content in inspection output (optional, default false)',
+                },
+                diffFormat: {
+                  type: 'string',
+                  enum: ['u', 'c', 'n', 's'],
+                  description: 'Diff format for describe when includeDiff=true',
                 },
                 includeFileHistory: {
                   type: 'boolean',
