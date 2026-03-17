@@ -549,7 +549,9 @@ class MCPPerforceServer {
   }
 
   private async executeTool(name: string, args: Record<string, unknown>): Promise<unknown> {
-    const handler = TOOL_HANDLERS[name];
+    // Normalize tool name: support both dot notation (p4.changes) and underscore (p4_changes)
+    const normalizedName = name.replace(/_/g, '.');
+    const handler = TOOL_HANDLERS[normalizedName];
     if (!handler) {
       throw new McpError(ErrorCode.MethodNotFound, `Unknown tool: ${name}`);
     }
@@ -561,11 +563,14 @@ class MCPPerforceServer {
     name: string,
     args: Record<string, unknown>
   ): Promise<{ result: unknown; cacheStatus: CacheStatus }> {
-    if (!this.responseCacheEnabled || !CACHEABLE_TOOLS.has(name)) {
+    // Normalize tool name for consistency in caching
+    const normalizedName = name.replace(/_/g, '.');
+    
+    if (!this.responseCacheEnabled || !CACHEABLE_TOOLS.has(normalizedName)) {
       return { result: await this.executeTool(name, args), cacheStatus: 'uncacheable' };
     }
 
-    const cacheKey = this.buildCacheKey(name, args);
+    const cacheKey = this.buildCacheKey(normalizedName, args);
     const cachedResult = this.getCachedResult(cacheKey);
     if (cachedResult) {
       return cachedResult;
@@ -585,7 +590,7 @@ class MCPPerforceServer {
       if (
         startedEpoch === this.cacheEpoch
       ) {
-        const toolTtlMs = this.getToolCacheTtlMs(name);
+        const toolTtlMs = this.getToolCacheTtlMs(normalizedName);
         if (result && typeof result === 'object' && (result as { ok?: boolean }).ok === true) {
           this.setCachedResult(cacheKey, result, toolTtlMs, false);
         } else if (this.shouldCacheNegativeResult(result)) {
@@ -1919,22 +1924,25 @@ class MCPPerforceServer {
     this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
       const startTime = Date.now();
       const { name, arguments: args } = request.params;
+      
+      // Normalize tool name: support both dot notation (p4.changes) and underscore (p4_changes)
+      const normalizedName = name.replace(/_/g, '.');
 
       try {
-        log.debug(`Calling tool: ${name}`);
+        log.debug(`Calling tool: ${name}${name !== normalizedName ? ` (normalized to ${normalizedName})` : ''}`);
 
         // Rate limiting check
-        const rateLimitResult = this.context.security.checkRateLimit(request.params.name);
+        const rateLimitResult = this.context.security.checkRateLimit(normalizedName);
         if (!rateLimitResult.allowed) {
-          const errorMsg = `Rate limit exceeded for tool ${name}. Try again after ${new Date(rateLimitResult.resetTime).toISOString()}`;
-          log.warn(`Rate limit exceeded: ${name}`);
+          const errorMsg = `Rate limit exceeded for tool ${normalizedName}. Try again after ${new Date(rateLimitResult.resetTime).toISOString()}`;
+          log.warn(`Rate limit exceeded: ${normalizedName}`);
 
           // Audit log the blocked request
           this.context.security.logAuditEntry({
-            tool: request.params.name,
+            tool: normalizedName,
             user: 'unknown', // Could be enhanced to extract from P4 config
             client: 'unknown',
-            operation: request.params.name,
+            operation: normalizedName,
             args: request.params.arguments || {},
             result: 'blocked',
             errorCode: 'RATE_LIMIT_EXCEEDED',
@@ -1955,15 +1963,15 @@ class MCPPerforceServer {
         }
 
         const toolArgs = (args || {}) as Record<string, unknown>;
-        const execution = await this.executeToolWithCaching(name, toolArgs);
+        const execution = await this.executeToolWithCaching(normalizedName, toolArgs);
         const result = execution.result;
 
-        if (WRITE_TOOLS.has(name) && result && typeof result === 'object' && (result as { ok?: boolean }).ok) {
+        if (WRITE_TOOLS.has(normalizedName) && result && typeof result === 'object' && (result as { ok?: boolean }).ok) {
           this.clearReadCache();
         }
 
         this.recordToolPerformance(
-          name,
+          normalizedName,
           Date.now() - startTime,
           result,
           execution.cacheStatus,
@@ -1972,10 +1980,10 @@ class MCPPerforceServer {
 
         // Audit log successful operation
         this.context.security.logAuditEntry({
-          tool: name,
+          tool: normalizedName,
           user: (result as { configUsed?: { P4USER?: string } } | undefined)?.configUsed?.P4USER || 'unknown',
           client: (result as { configUsed?: { P4CLIENT?: string } } | undefined)?.configUsed?.P4CLIENT || 'unknown',
-          operation: name,
+          operation: normalizedName,
           args: toolArgs,
           result: 'success',
           duration: Date.now() - startTime,
@@ -1988,7 +1996,7 @@ class MCPPerforceServer {
         const errorCode = error instanceof McpError ? error.code : 'INTERNAL_ERROR';
 
         this.recordToolPerformance(
-          name,
+          normalizedName,
           duration,
           { ok: false, error: { code: String(errorCode) } },
           'uncacheable'
@@ -1998,10 +2006,10 @@ class MCPPerforceServer {
 
         // Audit log failed operation
         this.context.security.logAuditEntry({
-          tool: name,
+          tool: normalizedName,
           user: 'unknown', // Could be enhanced to extract from context
           client: 'unknown',
-          operation: name,
+          operation: normalizedName,
           args: args || {},
           result: 'error',
           errorCode: typeof errorCode === 'string' ? errorCode : errorCode.toString(),
