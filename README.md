@@ -194,6 +194,7 @@ Write-capable tools blocked when `P4_READONLY_MODE=true`:
 - Includes both:
   - `p4.diff` for workspace/local vs depot diff.
   - `p4.diff2` for depot-to-depot server-side diff.
+- **Tool naming**: All tools use dot notation (e.g., `p4.changes`), but the server also accepts underscore notation (e.g., `p4_changes`) for compatibility with clients that transform tool names.
 
 ## Documentation
 
