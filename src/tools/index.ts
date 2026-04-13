@@ -54,6 +54,10 @@ export {
   p4ReviewBundle,
   p4ChangeInspect,
   p4PathSyncCheck,
+  p4FileInspect,
+  p4WorkspaceSnapshot,
+  p4SearchInspect,
+  p4ReviewPrepare,
 } from './workflows.js';
 
 // Export advanced functions

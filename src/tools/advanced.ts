@@ -6,6 +6,7 @@ import { P4Runner, P4RunResult } from '../p4/runner.js';
 import { P4Config, P4ServerConfig } from '../p4/config.js';
 import { SecurityManager } from '../p4/security.js';
 import * as parse from '../p4/parse.js';
+import { mergeStringArgs, sanitizeStringList, validateStringList } from './arg-utils.js';
 
 export interface ToolContext {
   runner: P4Runner;
@@ -19,17 +20,38 @@ export interface ToolContext {
  */
 export async function p4Users(
   context: ToolContext,
-  args: { user?: string; max?: number; workspacePath?: string }
+  args: { user?: string; users?: string[]; max?: number; includeServiceUsers?: boolean; workspacePath?: string }
 ): Promise<P4RunResult> {
+  const users = mergeStringArgs(args.user, args.users);
+  if (users.length > 0) {
+    const userValidation = validateStringList(users, 'users');
+    if (!userValidation.valid) {
+      return {
+        ok: false,
+        command: 'users',
+        args: [],
+        cwd: process.cwd(),
+        configUsed: {},
+        error: {
+          code: 'P4_INVALID_ARGS',
+          message: userValidation.error || 'Invalid users',
+        },
+      };
+    }
+  }
+
   const { cwd, env, configResult } = await context.config.setupForCommand(args.workspacePath);
 
   const cmdArgs: string[] = [];
+  if (args.includeServiceUsers) {
+    cmdArgs.push('-a');
+  }
   if (args.max) {
     cmdArgs.push('-m', args.max.toString());
   }
 
-  if (args.user) {
-    cmdArgs.push(args.user);
+  if (users.length > 0) {
+    cmdArgs.push(...users);
   }
 
   const result = await context.runner.run('users', cmdArgs, cwd, {
@@ -87,8 +109,32 @@ export async function p4User(
  */
 export async function p4Clients(
   context: ToolContext,
-  args: { user?: string; max?: number; workspacePath?: string }
+  args: {
+    user?: string;
+    max?: number;
+    stream?: string;
+    nameFilter?: string;
+    caseInsensitiveNameFilter?: string;
+    unloaded?: boolean;
+    allServers?: boolean;
+    serverId?: string;
+    workspacePath?: string;
+  }
 ): Promise<P4RunResult> {
+  if (args.nameFilter && args.caseInsensitiveNameFilter) {
+    return {
+      ok: false,
+      command: 'clients',
+      args: [],
+      cwd: process.cwd(),
+      configUsed: {},
+      error: {
+        code: 'P4_INVALID_ARGS',
+        message: 'nameFilter and caseInsensitiveNameFilter cannot both be specified',
+      },
+    };
+  }
+
   const { cwd, env, configResult } = await context.config.setupForCommand(args.workspacePath);
 
   const cmdArgs: string[] = [];
@@ -97,6 +143,24 @@ export async function p4Clients(
   }
   if (args.max) {
     cmdArgs.push('-m', args.max.toString());
+  }
+  if (args.stream) {
+    cmdArgs.push('-S', args.stream);
+  }
+  if (args.nameFilter) {
+    cmdArgs.push('-e', args.nameFilter);
+  }
+  if (args.caseInsensitiveNameFilter) {
+    cmdArgs.push('-E', args.caseInsensitiveNameFilter);
+  }
+  if (args.unloaded) {
+    cmdArgs.push('-U');
+  }
+  if (args.allServers) {
+    cmdArgs.push('-a');
+  }
+  if (args.serverId) {
+    cmdArgs.push('-s', args.serverId);
   }
 
   const result = await context.runner.run('clients', cmdArgs, cwd, {
@@ -154,17 +218,55 @@ export async function p4Client(
  */
 export async function p4Jobs(
   context: ToolContext,
-  args: { job?: string; max?: number; workspacePath?: string }
+  args: {
+    job?: string;
+    max?: number;
+    files?: string[];
+    jobView?: string;
+    includeIntegrated?: boolean;
+    reverseOrder?: boolean;
+    workspacePath?: string;
+  }
 ): Promise<P4RunResult> {
+  if (args.files) {
+    const fileValidation = sanitizeStringList(context.security, args.files, 'filespec', 'files');
+    if (!fileValidation.valid) {
+      return {
+        ok: false,
+        command: 'jobs',
+        args: [],
+        cwd: process.cwd(),
+        configUsed: {},
+        error: {
+          code: 'P4_INVALID_ARGS',
+          message: fileValidation.error || 'Invalid files',
+        },
+      };
+    }
+  }
+
   const { cwd, env, configResult } = await context.config.setupForCommand(args.workspacePath);
 
   const cmdArgs: string[] = [];
+  if (args.jobView) {
+    cmdArgs.push('-e', args.jobView);
+  }
+  if (args.includeIntegrated) {
+    cmdArgs.push('-i');
+  }
+  if (args.reverseOrder) {
+    cmdArgs.push('-r');
+  }
   if (args.max) {
     cmdArgs.push('-m', args.max.toString());
   }
 
   if (args.job) {
     cmdArgs.push(args.job);
+  }
+  if (args.files && args.files.length > 0) {
+    const fileValidation = sanitizeStringList(context.security, args.files, 'filespec', 'files');
+    cmdArgs.push(...(fileValidation.values || []));
   }
 
   const result = await context.runner.run('jobs', cmdArgs, cwd, {
@@ -231,8 +333,25 @@ export async function p4Job(
  */
 export async function p4Fixes(
   context: ToolContext,
-  args: { job?: string; changelist?: string; workspacePath?: string }
+  args: { job?: string; changelist?: string; files?: string[]; workspacePath?: string }
 ): Promise<P4RunResult> {
+  if (args.files) {
+    const fileValidation = sanitizeStringList(context.security, args.files, 'filespec', 'files');
+    if (!fileValidation.valid) {
+      return {
+        ok: false,
+        command: 'fixes',
+        args: [],
+        cwd: process.cwd(),
+        configUsed: {},
+        error: {
+          code: 'P4_INVALID_ARGS',
+          message: fileValidation.error || 'Invalid files',
+        },
+      };
+    }
+  }
+
   const { cwd, env, configResult } = await context.config.setupForCommand(args.workspacePath);
 
   const cmdArgs: string[] = [];
@@ -241,6 +360,10 @@ export async function p4Fixes(
   }
   if (args.changelist) {
     cmdArgs.push('-c', args.changelist);
+  }
+  if (args.files && args.files.length > 0) {
+    const fileValidation = sanitizeStringList(context.security, args.files, 'filespec', 'files');
+    cmdArgs.push(...(fileValidation.values || []));
   }
 
   const result = await context.runner.run('fixes', cmdArgs, cwd, {
@@ -266,8 +389,66 @@ export async function p4Fixes(
  */
 export async function p4Labels(
   context: ToolContext,
-  args: { label?: string; user?: string; max?: number; workspacePath?: string }
+  args: {
+    label?: string;
+    user?: string;
+    max?: number;
+    filespec?: string;
+    filespecs?: string[];
+    nameFilter?: string;
+    caseInsensitiveNameFilter?: string;
+    unloaded?: boolean;
+    autoreloadOnly?: boolean;
+    allServers?: boolean;
+    serverId?: string;
+    workspacePath?: string;
+  }
 ): Promise<P4RunResult> {
+  if (args.nameFilter && args.caseInsensitiveNameFilter) {
+    return {
+      ok: false,
+      command: 'labels',
+      args: [],
+      cwd: process.cwd(),
+      configUsed: {},
+      error: {
+        code: 'P4_INVALID_ARGS',
+        message: 'nameFilter and caseInsensitiveNameFilter cannot both be specified',
+      },
+    };
+  }
+
+  const filespecs = mergeStringArgs(args.filespec, args.filespecs);
+  if (filespecs.length > 0) {
+    const filespecValidation = sanitizeStringList(context.security, filespecs, 'filespec', 'filespecs');
+    if (!filespecValidation.valid) {
+      return {
+        ok: false,
+        command: 'labels',
+        args: [],
+        cwd: process.cwd(),
+        configUsed: {},
+        error: {
+          code: 'P4_INVALID_ARGS',
+          message: filespecValidation.error || 'Invalid filespecs',
+        },
+      };
+    }
+    if (args.allServers || args.serverId) {
+      return {
+        ok: false,
+        command: 'labels',
+        args: [],
+        cwd: process.cwd(),
+        configUsed: {},
+        error: {
+          code: 'P4_INVALID_ARGS',
+          message: 'allServers/serverId cannot be combined with file-based label filtering',
+        },
+      };
+    }
+  }
+
   const { cwd, env, configResult } = await context.config.setupForCommand(args.workspacePath);
 
   const cmdArgs: string[] = [];
@@ -277,9 +458,31 @@ export async function p4Labels(
   if (args.max) {
     cmdArgs.push('-m', args.max.toString());
   }
+  if (args.nameFilter) {
+    cmdArgs.push('-e', args.nameFilter);
+  }
+  if (args.caseInsensitiveNameFilter) {
+    cmdArgs.push('-E', args.caseInsensitiveNameFilter);
+  }
+  if (args.unloaded) {
+    cmdArgs.push('-U');
+  }
+  if (args.autoreloadOnly) {
+    cmdArgs.push('-R');
+  }
+  if (args.allServers) {
+    cmdArgs.push('-a');
+  }
+  if (args.serverId) {
+    cmdArgs.push('-s', args.serverId);
+  }
 
   if (args.label) {
     cmdArgs.push(args.label);
+  }
+  if (filespecs.length > 0) {
+    const filespecValidation = sanitizeStringList(context.security, filespecs, 'filespec', 'filespecs');
+    cmdArgs.push(...(filespecValidation.values || []));
   }
 
   const result = await context.runner.run('labels', cmdArgs, cwd, {
@@ -346,13 +549,56 @@ export async function p4Label(
  */
 export async function p4Sizes(
   context: ToolContext,
-  args: { filespec?: string; workspacePath?: string }
+  args: {
+    filespec?: string;
+    filespecs?: string[];
+    allRevisions?: boolean;
+    shelvedOnly?: boolean;
+    omitLazyCopies?: boolean;
+    max?: number;
+    blockSize?: number;
+    workspacePath?: string;
+  }
 ): Promise<P4RunResult> {
+  const filespecs = mergeStringArgs(args.filespec, args.filespecs);
+  if (filespecs.length > 0) {
+    const filespecValidation = sanitizeStringList(context.security, filespecs, 'filespec', 'filespecs');
+    if (!filespecValidation.valid) {
+      return {
+        ok: false,
+        command: 'sizes',
+        args: [],
+        cwd: process.cwd(),
+        configUsed: {},
+        error: {
+          code: 'P4_INVALID_ARGS',
+          message: filespecValidation.error || 'Invalid filespecs',
+        },
+      };
+    }
+  }
+
   const { cwd, env, configResult } = await context.config.setupForCommand(args.workspacePath);
 
   const cmdArgs: string[] = ['-s']; // Summary only
-  if (args.filespec) {
-    cmdArgs.push(args.filespec);
+  if (args.allRevisions) {
+    cmdArgs.push('-a');
+  }
+  if (args.shelvedOnly) {
+    cmdArgs.push('-S');
+  }
+  if (args.omitLazyCopies) {
+    cmdArgs.push('-z');
+  }
+  if (args.max && args.max > 0) {
+    cmdArgs.push('-m', args.max.toString());
+  }
+  if (args.blockSize && args.blockSize > 0) {
+    cmdArgs.push('-b', args.blockSize.toString());
+  }
+  if (filespecs.length > 0) {
+    const filespecValidation = sanitizeStringList(context.security, filespecs, 'filespec', 'filespecs');
+    cmdArgs.push(...(filespecValidation.values || []));
   } else {
     cmdArgs.push('...');
   }
@@ -380,13 +626,32 @@ export async function p4Sizes(
  */
 export async function p4Have(
   context: ToolContext,
-  args: { filespec?: string; workspacePath?: string }
+  args: { filespec?: string; filespecs?: string[]; workspacePath?: string }
 ): Promise<P4RunResult> {
+  const filespecs = mergeStringArgs(args.filespec, args.filespecs);
+  if (filespecs.length > 0) {
+    const filespecValidation = sanitizeStringList(context.security, filespecs, 'filespec', 'filespecs');
+    if (!filespecValidation.valid) {
+      return {
+        ok: false,
+        command: 'have',
+        args: [],
+        cwd: process.cwd(),
+        configUsed: {},
+        error: {
+          code: 'P4_INVALID_ARGS',
+          message: filespecValidation.error || 'Invalid filespecs',
+        },
+      };
+    }
+  }
+
   const { cwd, env, configResult } = await context.config.setupForCommand(args.workspacePath);
 
   const cmdArgs: string[] = [];
-  if (args.filespec) {
-    cmdArgs.push(args.filespec);
+  if (filespecs.length > 0) {
+    const filespecValidation = sanitizeStringList(context.security, filespecs, 'filespec', 'filespecs');
+    cmdArgs.push(...(filespecValidation.values || []));
   }
 
   const result = await context.runner.run('have', cmdArgs, cwd, {

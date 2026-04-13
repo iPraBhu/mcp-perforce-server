@@ -3,10 +3,11 @@
  */
 
 import { P4RunResult } from '../p4/runner.js';
-import { ToolContext, p4Interchanges, p4Integrated, p4Review, p4Reviews } from './basic.js';
+import { ToolContext, p4Blame, p4Changes, p4Fstat, p4Grep, p4Info, p4Interchanges, p4Integrated, p4Opened, p4Print, p4Review, p4Reviews, p4Status } from './basic.js';
 import { p4Describe } from './changelist.js';
 import { p4Fixes } from './advanced.js';
-import { p4Filelog } from './utils.js';
+import { p4ConfigDetect, p4Filelog } from './utils.js';
+import { mergeStringArgs } from './arg-utils.js';
 
 interface CompositeStep<T = unknown> {
   ok: boolean;
@@ -26,6 +27,42 @@ function getStringChangelist(value: unknown): string | null {
     return value.trim();
   }
   return null;
+}
+
+function getStringArray(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [];
+}
+
+function getFstatRecordForInput(
+  records: Record<string, unknown>[],
+  input: string
+): Record<string, unknown> | undefined {
+  const normalizedInput = input.trim();
+  return records.find((record) => {
+    const depotFile = typeof record.depotFile === 'string' ? record.depotFile : null;
+    const clientFile = typeof record.clientFile === 'string' ? record.clientFile : null;
+    const path = typeof record.path === 'string' ? record.path : null;
+    return depotFile === normalizedInput || clientFile === normalizedInput || path === normalizedInput;
+  });
+}
+
+function buildContextSnippets(
+  content: string,
+  matchLines: number[],
+  contextLines: number
+): Array<{ line: number; startLine: number; endLine: number; snippet: string }> {
+  const lines = content.split(/\r?\n/);
+  return matchLines.map((lineNumber) => {
+    const startLine = Math.max(1, lineNumber - contextLines);
+    const endLine = Math.min(lines.length, lineNumber + contextLines);
+    const snippet = lines.slice(startLine - 1, endLine).join('\n');
+    return {
+      line: lineNumber,
+      startLine,
+      endLine,
+      snippet,
+    };
+  });
 }
 
 function getWorkflowConcurrency(): number {
@@ -560,6 +597,635 @@ export async function p4PathSyncCheck(
               error: integratedReverse.error,
             } as CompositeStep)
           : undefined,
+      },
+    },
+  };
+}
+
+/**
+ * p4.file.inspect - Aggregate metadata, history, content, and blame for one or more files
+ */
+export async function p4FileInspect(
+  context: ToolContext,
+  args: {
+    filespec?: string;
+    filespecs?: string[];
+    includeFstat?: boolean;
+    includeHistory?: boolean;
+    includeContent?: boolean;
+    includeBlame?: boolean;
+    maxFiles?: number;
+    maxRevisions?: number;
+    workspacePath?: string;
+  }
+): Promise<P4RunResult> {
+  const requestedFiles = mergeStringArgs(args.filespec, args.filespecs);
+  if (requestedFiles.length === 0) {
+    return {
+      ok: false,
+      command: 'file.inspect',
+      args: [],
+      cwd: process.cwd(),
+      configUsed: {},
+      error: {
+        code: 'P4_INVALID_ARGS',
+        message: 'filespec or filespecs is required',
+      },
+    };
+  }
+
+  const workflowConcurrency = getWorkflowConcurrency();
+  const maxFiles = Math.max(1, Math.min(args.maxFiles || requestedFiles.length, 25));
+  const maxRevisions = Math.max(1, Math.min(args.maxRevisions || 5, 50));
+  const selectedFiles = requestedFiles.slice(0, maxFiles);
+  const includeFstat = args.includeFstat !== false;
+  const includeHistory = args.includeHistory !== false;
+  const includeContent = args.includeContent === true;
+  const includeBlame = args.includeBlame === true;
+
+  const warnings: string[] = [];
+  const subcallCounts: Record<string, number> = {
+    fstat: 0,
+    filelog: 0,
+    print: 0,
+    blame: 0,
+  };
+
+  let fstatStep: CompositeStep | undefined;
+  let fstatRecords: Record<string, unknown>[] = [];
+  if (includeFstat) {
+    const fstatResult = await p4Fstat(context, {
+      filespecs: selectedFiles,
+      workspacePath: args.workspacePath,
+    });
+    subcallCounts.fstat = 1;
+    fstatStep = {
+      ok: fstatResult.ok,
+      result: fstatResult.result,
+      error: fstatResult.error,
+    };
+    fstatRecords = getArrayResult(fstatResult.result);
+    if (fstatResult.warnings) {
+      warnings.push(...fstatResult.warnings);
+    }
+  }
+
+  const historyResults = includeHistory
+    ? await runWithConcurrencyLimit(
+        selectedFiles,
+        workflowConcurrency,
+        async (filespec) => ({
+          filespec,
+          response: await p4Filelog(context, {
+            filespec,
+            maxRevisions,
+            workspacePath: args.workspacePath,
+          }),
+        })
+      )
+    : [];
+  subcallCounts.filelog = historyResults.length;
+
+  const printResults = includeContent
+    ? await runWithConcurrencyLimit(
+        selectedFiles,
+        workflowConcurrency,
+        async (filespec) => ({
+          filespec,
+          response: await p4Print(context, {
+            filespec,
+            quiet: true,
+            workspacePath: args.workspacePath,
+          }),
+        })
+      )
+    : [];
+  subcallCounts.print = printResults.length;
+
+  const blameResults = includeBlame
+    ? await runWithConcurrencyLimit(
+        selectedFiles,
+        workflowConcurrency,
+        async (filespec) => ({
+          filespec,
+          response: await p4Blame(context, {
+            file: filespec,
+            workspacePath: args.workspacePath,
+          }),
+        })
+      )
+    : [];
+  subcallCounts.blame = blameResults.length;
+
+  const historyByFile = new Map(historyResults.map((entry) => [entry.filespec, entry.response]));
+  const printByFile = new Map(printResults.map((entry) => [entry.filespec, entry.response]));
+  const blameByFile = new Map(blameResults.map((entry) => [entry.filespec, entry.response]));
+
+  for (const entry of [...historyResults, ...printResults, ...blameResults]) {
+    if (entry.response.warnings) {
+      warnings.push(...entry.response.warnings);
+    }
+  }
+
+  const inspectedFiles = selectedFiles.map((filespec) => {
+    const history = historyByFile.get(filespec);
+    const printed = printByFile.get(filespec);
+    const blame = blameByFile.get(filespec);
+    return {
+      filespec,
+      fstat: includeFstat
+        ? ({
+            ok: !!fstatStep?.ok,
+            result: getFstatRecordForInput(fstatRecords, filespec),
+            error: fstatStep?.ok ? undefined : fstatStep?.error,
+          } as CompositeStep)
+        : undefined,
+      history: history
+        ? ({
+            ok: history.ok,
+            result: history.result,
+            error: history.error,
+          } as CompositeStep)
+        : undefined,
+      content: printed
+        ? ({
+            ok: printed.ok,
+            result: printed.result,
+            error: printed.error,
+          } as CompositeStep)
+        : undefined,
+      blame: blame
+        ? ({
+            ok: blame.ok,
+            result: blame.result,
+            error: blame.error,
+          } as CompositeStep)
+        : undefined,
+    };
+  });
+
+  const firstResponse =
+    historyResults[0]?.response ||
+    printResults[0]?.response ||
+    blameResults[0]?.response;
+
+  return {
+    ok: true,
+    command: 'file.inspect',
+    args: [],
+    cwd: firstResponse?.cwd || process.cwd(),
+    configUsed: firstResponse?.configUsed || {},
+    warnings: warnings.length > 0 ? warnings : undefined,
+    result: {
+      summary: {
+        requestedFiles: requestedFiles.length,
+        includedFiles: inspectedFiles.length,
+        includeFstat,
+        includeHistory,
+        includeContent,
+        includeBlame,
+        maxRevisions,
+        workflowConcurrency,
+      },
+      files: inspectedFiles,
+      meta: {
+        subcallCounts,
+        totalSubcalls: Object.values(subcallCounts).reduce((sum, value) => sum + value, 0),
+      },
+      steps: {
+        fstat: fstatStep,
+      },
+    },
+  };
+}
+
+/**
+ * p4.workspace.snapshot - Aggregate workspace info, status, config, and optional details
+ */
+export async function p4WorkspaceSnapshot(
+  context: ToolContext,
+  args: {
+    includeConfig?: boolean;
+    includeOpened?: boolean;
+    includeRecentChanges?: boolean;
+    recentChangesMax?: number;
+    workspacePath?: string;
+  } = {}
+): Promise<P4RunResult> {
+  const includeConfig = args.includeConfig !== false;
+  const includeOpened = args.includeOpened === true;
+  const includeRecentChanges = args.includeRecentChanges === true;
+  const recentChangesMax = Math.max(1, Math.min(args.recentChangesMax || 10, 50));
+
+  const [infoResult, statusResult, configResult, openedResult, recentChangesResult] = await Promise.all([
+    p4Info(context, { workspacePath: args.workspacePath }),
+    p4Status(context, { workspacePath: args.workspacePath }),
+    includeConfig ? p4ConfigDetect(context, { workspacePath: args.workspacePath }) : Promise.resolve(null),
+    includeOpened ? p4Opened(context, { workspacePath: args.workspacePath }) : Promise.resolve(null),
+    includeRecentChanges
+      ? p4Changes(context, {
+          max: recentChangesMax,
+          workspacePath: args.workspacePath,
+        })
+      : Promise.resolve(null),
+  ]);
+
+  if (!infoResult.ok && !statusResult.ok) {
+    return {
+      ok: false,
+      command: 'workspace.snapshot',
+      args: [],
+      cwd: statusResult.cwd || infoResult.cwd || process.cwd(),
+      configUsed: statusResult.configUsed || infoResult.configUsed || {},
+      error: statusResult.error || infoResult.error,
+      warnings: [...(infoResult.warnings || []), ...(statusResult.warnings || [])],
+    };
+  }
+
+  const warnings: string[] = [
+    ...(infoResult.warnings || []),
+    ...(statusResult.warnings || []),
+    ...(configResult?.warnings || []),
+    ...(openedResult?.warnings || []),
+    ...(recentChangesResult?.warnings || []),
+  ];
+
+  const statusData =
+    statusResult.result && typeof statusResult.result === 'object'
+      ? (statusResult.result as Record<string, unknown>)
+      : {};
+  const summaryData =
+    statusData.summary && typeof statusData.summary === 'object'
+      ? (statusData.summary as Record<string, unknown>)
+      : {};
+
+  return {
+    ok: true,
+    command: 'workspace.snapshot',
+    args: [],
+    cwd: statusResult.cwd || infoResult.cwd || process.cwd(),
+    configUsed: statusResult.configUsed || infoResult.configUsed || {},
+    warnings: warnings.length > 0 ? warnings : undefined,
+    result: {
+      summary: {
+        totalOpenedFiles: summaryData.totalOpenedFiles || 0,
+        totalPendingChanges: summaryData.totalPendingChanges || 0,
+        filesByAction: summaryData.filesByAction || {},
+        recentChangesCount: recentChangesResult ? getArrayResult(recentChangesResult.result).length : 0,
+        includeConfig,
+        includeOpened,
+        includeRecentChanges,
+      },
+      steps: {
+        info: {
+          ok: infoResult.ok,
+          result: infoResult.result,
+          error: infoResult.error,
+        } as CompositeStep,
+        status: {
+          ok: statusResult.ok,
+          result: statusResult.result,
+          error: statusResult.error,
+        } as CompositeStep,
+        config: configResult
+          ? ({
+              ok: configResult.ok,
+              result: configResult.result,
+              error: configResult.error,
+            } as CompositeStep)
+          : undefined,
+        opened: openedResult
+          ? ({
+              ok: openedResult.ok,
+              result: openedResult.result,
+              error: openedResult.error,
+            } as CompositeStep)
+          : undefined,
+        recentChanges: recentChangesResult
+          ? ({
+              ok: recentChangesResult.ok,
+              result: recentChangesResult.result,
+              error: recentChangesResult.error,
+            } as CompositeStep)
+          : undefined,
+      },
+      meta: {
+        subcallCounts: {
+          info: 1,
+          status: 1,
+          config: includeConfig ? 1 : 0,
+          opened: includeOpened ? 1 : 0,
+          changes: includeRecentChanges ? 1 : 0,
+        },
+      },
+    },
+  };
+}
+
+/**
+ * p4.search.inspect - Aggregate grep matches with grouped file metadata and optional content snippets
+ */
+export async function p4SearchInspect(
+  context: ToolContext,
+  args: {
+    pattern: string;
+    filespec?: string;
+    filespecs?: string[];
+    caseInsensitive?: boolean;
+    maxFiles?: number;
+    maxMatchesPerFile?: number;
+    includeFstat?: boolean;
+    includeContentPreview?: boolean;
+    previewContextLines?: number;
+    workspacePath?: string;
+  }
+): Promise<P4RunResult> {
+  if (!args.pattern) {
+    return {
+      ok: false,
+      command: 'search.inspect',
+      args: [],
+      cwd: process.cwd(),
+      configUsed: {},
+      error: {
+        code: 'P4_INVALID_ARGS',
+        message: 'pattern is required',
+      },
+    };
+  }
+
+  const requestedFilespecs = mergeStringArgs(args.filespec, args.filespecs);
+  const maxFiles = Math.max(1, Math.min(args.maxFiles || 20, 100));
+  const maxMatchesPerFile = Math.max(1, Math.min(args.maxMatchesPerFile || 10, 100));
+  const previewContextLines = Math.max(0, Math.min(args.previewContextLines || 2, 20));
+  const includeFstat = args.includeFstat !== false;
+  const includeContentPreview = args.includeContentPreview === true;
+  const workflowConcurrency = getWorkflowConcurrency();
+
+  const grepResult = await p4Grep(context, {
+    pattern: args.pattern,
+    filespecs: requestedFilespecs.length > 0 ? requestedFilespecs : undefined,
+    caseInsensitive: args.caseInsensitive,
+    workspacePath: args.workspacePath,
+  });
+
+  if (!grepResult.ok) {
+    return {
+      ok: false,
+      command: 'search.inspect',
+      args: [],
+      cwd: grepResult.cwd,
+      configUsed: grepResult.configUsed || {},
+      error: grepResult.error,
+      warnings: grepResult.warnings,
+    };
+  }
+
+  const grepMatches = getArrayResult(grepResult.result);
+  const groupedMatches = new Map<string, Record<string, unknown>[]>();
+  for (const match of grepMatches) {
+    const file = typeof match.file === 'string' ? match.file : null;
+    if (!file) continue;
+    const existing = groupedMatches.get(file) || [];
+    if (existing.length < maxMatchesPerFile) {
+      existing.push(match);
+      groupedMatches.set(file, existing);
+    }
+  }
+
+  const selectedFiles = Array.from(groupedMatches.keys()).slice(0, maxFiles);
+  const warnings: string[] = [...(grepResult.warnings || [])];
+  const subcallCounts: Record<string, number> = {
+    grep: 1,
+    fstat: 0,
+    print: 0,
+  };
+
+  let fstatRecords: Record<string, unknown>[] = [];
+  if (includeFstat && selectedFiles.length > 0) {
+    const fstatResult = await p4Fstat(context, {
+      filespecs: selectedFiles,
+      workspacePath: args.workspacePath,
+    });
+    subcallCounts.fstat = 1;
+    fstatRecords = getArrayResult(fstatResult.result);
+    if (fstatResult.warnings) {
+      warnings.push(...fstatResult.warnings);
+    }
+  }
+
+  const printResults = includeContentPreview && selectedFiles.length > 0
+    ? await runWithConcurrencyLimit(
+        selectedFiles,
+        workflowConcurrency,
+        async (filespec) => ({
+          filespec,
+          response: await p4Print(context, {
+            filespec,
+            quiet: true,
+            workspacePath: args.workspacePath,
+          }),
+        })
+      )
+    : [];
+  subcallCounts.print = printResults.length;
+  const printByFile = new Map(printResults.map((entry) => [entry.filespec, entry.response]));
+  for (const entry of printResults) {
+    if (entry.response.warnings) {
+      warnings.push(...entry.response.warnings);
+    }
+  }
+
+  const files = selectedFiles.map((filespec) => {
+    const matches = groupedMatches.get(filespec) || [];
+    const printed = printByFile.get(filespec);
+    const content =
+      printed &&
+      printed.result &&
+      typeof printed.result === 'object' &&
+      typeof (printed.result as Record<string, unknown>).content === 'string'
+        ? ((printed.result as Record<string, unknown>).content as string)
+        : '';
+    const matchLines = matches
+      .map((match) => (typeof match.line === 'number' ? match.line : null))
+      .filter((line): line is number => line !== null);
+    return {
+      filespec,
+      totalMatches: matches.length,
+      matches,
+      fstat: includeFstat ? getFstatRecordForInput(fstatRecords, filespec) : undefined,
+      previews: includeContentPreview && content
+        ? buildContextSnippets(content, matchLines, previewContextLines)
+        : undefined,
+    };
+  });
+
+  return {
+    ok: true,
+    command: 'search.inspect',
+    args: [],
+    cwd: grepResult.cwd,
+    configUsed: grepResult.configUsed || {},
+    warnings: warnings.length > 0 ? warnings : undefined,
+    result: {
+      summary: {
+        pattern: args.pattern,
+        requestedFilespecs: requestedFilespecs.length,
+        matchedFiles: groupedMatches.size,
+        includedFiles: files.length,
+        totalMatches: grepMatches.length,
+        includeFstat,
+        includeContentPreview,
+        previewContextLines,
+        workflowConcurrency,
+      },
+      files,
+      meta: {
+        subcallCounts,
+        totalSubcalls: Object.values(subcallCounts).reduce((sum, value) => sum + value, 0),
+      },
+      steps: {
+        grep: {
+          ok: grepResult.ok,
+          result: grepResult.result,
+          error: grepResult.error,
+        } as CompositeStep,
+      },
+    },
+  };
+}
+
+/**
+ * p4.review.prepare - Build review-ready context for explicit or discovered changelists
+ */
+export async function p4ReviewPrepare(
+  context: ToolContext,
+  args: {
+    changelist?: string;
+    changelists?: string[];
+    status?: 'submitted' | 'pending' | 'shelved';
+    user?: string;
+    client?: string;
+    filespec?: string;
+    filespecs?: string[];
+    maxChanges?: number;
+    includeDiff?: boolean;
+    diffFormat?: 'u' | 'c' | 'n' | 's';
+    includeFileHistory?: boolean;
+    maxFilesWithHistory?: number;
+    maxRevisions?: number;
+    workspacePath?: string;
+  } = {}
+): Promise<P4RunResult> {
+  const explicitChanges = mergeStringArgs(args.changelist, args.changelists).filter((value) => /^\d+$/.test(value));
+  const maxChanges = Math.max(1, Math.min(args.maxChanges || explicitChanges.length || 10, 50));
+  const workflowConcurrency = getWorkflowConcurrency();
+
+  let selectedChanges = explicitChanges.slice(0, maxChanges);
+  let discoveryStep: CompositeStep | undefined;
+  const warnings: string[] = [];
+  const subcallCounts: Record<string, number> = {
+    changes: 0,
+    changeInspect: 0,
+  };
+
+  if (selectedChanges.length === 0) {
+    const filespecs = mergeStringArgs(args.filespec, args.filespecs);
+    const changesResult = await p4Changes(context, {
+      status: args.status,
+      user: args.user,
+      client: args.client,
+      filespecs: filespecs.length > 0 ? filespecs : undefined,
+      max: maxChanges,
+      workspacePath: args.workspacePath,
+    });
+    subcallCounts.changes = 1;
+    discoveryStep = {
+      ok: changesResult.ok,
+      result: changesResult.result,
+      error: changesResult.error,
+    };
+    if (!changesResult.ok) {
+      return {
+        ok: false,
+        command: 'review.prepare',
+        args: [],
+        cwd: changesResult.cwd,
+        configUsed: changesResult.configUsed || {},
+        error: changesResult.error,
+        warnings: changesResult.warnings,
+        result: {
+          steps: {
+            discovery: discoveryStep,
+          },
+        },
+      };
+    }
+    if (changesResult.warnings) {
+      warnings.push(...changesResult.warnings);
+    }
+    selectedChanges = getArrayResult(changesResult.result)
+      .map((record) => getStringChangelist(record.change))
+      .filter((value): value is string => value !== null)
+      .slice(0, maxChanges);
+  }
+
+  const inspectionResults = await runWithConcurrencyLimit(
+    selectedChanges,
+    workflowConcurrency,
+    async (changelist) => ({
+      changelist,
+      response: await p4ChangeInspect(context, {
+        changelist,
+        includeDiff: args.includeDiff,
+        diffFormat: args.diffFormat,
+        includeFileHistory: args.includeFileHistory,
+        maxFilesWithHistory: args.maxFilesWithHistory,
+        maxRevisions: args.maxRevisions,
+        workspacePath: args.workspacePath,
+      }),
+    })
+  );
+  subcallCounts.changeInspect = inspectionResults.length;
+
+  for (const entry of inspectionResults) {
+    if (entry.response.warnings) {
+      warnings.push(...entry.response.warnings);
+    }
+  }
+
+  const changes = inspectionResults.map((entry) => ({
+    changelist: entry.changelist,
+    inspection: {
+      ok: entry.response.ok,
+      result: entry.response.result,
+      error: entry.response.error,
+    } as CompositeStep,
+  }));
+
+  const firstResponse = inspectionResults[0]?.response;
+
+  return {
+    ok: true,
+    command: 'review.prepare',
+    args: [],
+    cwd: firstResponse?.cwd || process.cwd(),
+    configUsed: firstResponse?.configUsed || {},
+    warnings: warnings.length > 0 ? warnings : undefined,
+    result: {
+      summary: {
+        selectedChanges: selectedChanges.length,
+        includeDiff: args.includeDiff === true,
+        includeFileHistory: args.includeFileHistory === true,
+        workflowConcurrency,
+      },
+      changes,
+      meta: {
+        subcallCounts,
+        totalSubcalls: Object.values(subcallCounts).reduce((sum, value) => sum + value, 0),
+      },
+      steps: {
+        discovery: discoveryStep,
       },
     },
   };

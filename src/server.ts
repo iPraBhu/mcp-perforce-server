@@ -89,6 +89,10 @@ const TOOL_HANDLERS: Record<string, ToolHandler> = {
   'p4.review.bundle': tools.p4ReviewBundle as ToolHandler,
   'p4.change.inspect': tools.p4ChangeInspect as ToolHandler,
   'p4.path.synccheck': tools.p4PathSyncCheck as ToolHandler,
+  'p4.file.inspect': tools.p4FileInspect as ToolHandler,
+  'p4.workspace.snapshot': tools.p4WorkspaceSnapshot as ToolHandler,
+  'p4.search.inspect': tools.p4SearchInspect as ToolHandler,
+  'p4.review.prepare': tools.p4ReviewPrepare as ToolHandler,
   'p4.blame': tools.p4Blame as ToolHandler,
   'p4.annotate': tools.p4Annotate as ToolHandler,
   'p4.copy': tools.p4Copy as ToolHandler,
@@ -151,6 +155,10 @@ const LOW_LATENCY_CACHE_TTL_TOOLS = new Set<string>([
   'p4.review.bundle',
   'p4.change.inspect',
   'p4.path.synccheck',
+  'p4.file.inspect',
+  'p4.workspace.snapshot',
+  'p4.search.inspect',
+  'p4.review.prepare',
 ]);
 
 const STABLE_CACHE_TTL_TOOLS = new Set<string>([
@@ -745,6 +753,11 @@ class MCPPerforceServer {
                   type: 'string',
                   description: 'Filespec to sync (optional, defaults to current directory)',
                 },
+                filespecs: {
+                  type: 'array',
+                  items: { type: 'string' },
+                  description: 'Filespecs to sync in one command (optional)',
+                },
                 force: {
                   type: 'boolean',
                   description: 'Force sync (optional, defaults to false)',
@@ -752,6 +765,42 @@ class MCPPerforceServer {
                 preview: {
                   type: 'boolean',
                   description: 'Preview sync without executing (optional, defaults to false)',
+                },
+                summaryPreview: {
+                  type: 'boolean',
+                  description: 'Preview only the sync summary using p4 sync -N (optional)',
+                },
+                quiet: {
+                  type: 'boolean',
+                  description: 'Suppress normal sync messages using -q (optional)',
+                },
+                metadataOnly: {
+                  type: 'boolean',
+                  description: 'Update have-list metadata only using -k (optional)',
+                },
+                safeSync: {
+                  type: 'boolean',
+                  description: 'Enable digest safety checks using -s (optional)',
+                },
+                populateOnly: {
+                  type: 'boolean',
+                  description: 'Populate without updating server state using -p (optional)',
+                },
+                reopenMoved: {
+                  type: 'boolean',
+                  description: 'Reopen moved files in new depot locations using -r (optional)',
+                },
+                useListOptimization: {
+                  type: 'boolean',
+                  description: 'Use the -L file list optimization for exact depot revisions (optional)',
+                },
+                max: {
+                  type: 'number',
+                  description: 'Limit sync to the first max files (optional)',
+                },
+                parallel: {
+                  type: 'string',
+                  description: 'Parallel sync specification, for example threads=4,batch=8 (optional)',
                 },
                 workspacePath: {
                   type: 'string',
@@ -770,6 +819,11 @@ class MCPPerforceServer {
                 changelist: {
                   type: 'string',
                   description: 'Changelist number (optional, shows all opened files if not specified)',
+                },
+                files: {
+                  type: 'array',
+                  items: { type: 'string' },
+                  description: 'Optional files/filespecs to check for opened state',
                 },
                 workspacePath: {
                   type: 'string',
@@ -965,6 +1019,11 @@ class MCPPerforceServer {
                   type: 'string',
                   description: 'Filespec to show history for (required)',
                 },
+                filespecs: {
+                  type: 'array',
+                  items: { type: 'string' },
+                  description: 'Filespecs to show history for in one command (required if filespec is omitted)',
+                },
                 maxRevisions: {
                   type: 'number',
                   description: 'Maximum number of revisions to show (optional)',
@@ -974,7 +1033,10 @@ class MCPPerforceServer {
                   description: 'Path to workspace directory (optional, defaults to current directory)',
                 },
               },
-              required: ['filespec'],
+              anyOf: [
+                { required: ['filespec'] },
+                { required: ['filespecs'] },
+              ],
               additionalProperties: false,
             },
           },
@@ -987,6 +1049,30 @@ class MCPPerforceServer {
                 user: {
                   type: 'string',
                   description: 'Filter by user (optional)',
+                },
+                stream: {
+                  type: 'string',
+                  description: 'Limit workspaces to a dedicated stream using -S (optional)',
+                },
+                nameFilter: {
+                  type: 'string',
+                  description: 'Workspace name filter using -e (optional)',
+                },
+                caseInsensitiveNameFilter: {
+                  type: 'string',
+                  description: 'Case-insensitive workspace name filter using -E (optional)',
+                },
+                unloaded: {
+                  type: 'boolean',
+                  description: 'List unloaded clients using -U (optional)',
+                },
+                allServers: {
+                  type: 'boolean',
+                  description: 'List clients across all servers using -a (optional)',
+                },
+                serverId: {
+                  type: 'string',
+                  description: 'Limit clients to a specific server using -s (optional)',
                 },
                 max: {
                   type: 'number',
@@ -1126,6 +1212,11 @@ class MCPPerforceServer {
                   type: 'string',
                   description: 'Filter by filespec (optional)',
                 },
+                filespecs: {
+                  type: 'array',
+                  items: { type: 'string' },
+                  description: 'Filter by multiple filespecs (optional)',
+                },
                 workspacePath: {
                   type: 'string',
                   description: 'Path to workspace directory (optional, defaults to current directory)',
@@ -1193,6 +1284,27 @@ class MCPPerforceServer {
                   type: 'string',
                   description: 'Target depot filespec/path (required)',
                 },
+                targetPaths: {
+                  type: 'array',
+                  items: { type: 'string' },
+                  description: 'Additional target depot filespecs for branch or path modes (optional)',
+                },
+                branch: {
+                  type: 'string',
+                  description: 'Branch spec name for p4 interchanges -b mode (optional)',
+                },
+                stream: {
+                  type: 'string',
+                  description: 'Stream path for p4 interchanges -S mode (optional)',
+                },
+                parentStream: {
+                  type: 'string',
+                  description: 'Parent stream override for stream mode using -P (optional)',
+                },
+                useBranchSource: {
+                  type: 'boolean',
+                  description: 'Use branch -s mode where sourcePath becomes fromFile (optional)',
+                },
                 max: {
                   type: 'number',
                   description: 'Maximum number of changelists to return (optional)',
@@ -1201,12 +1313,33 @@ class MCPPerforceServer {
                   type: 'boolean',
                   description: 'Include long descriptions (optional, equivalent to -l)',
                 },
+                reverse: {
+                  type: 'boolean',
+                  description: 'Reverse branch or stream mapping direction using -r (optional)',
+                },
+                time: {
+                  type: 'boolean',
+                  description: 'Display the time as well as the date using -t (optional)',
+                },
+                user: {
+                  type: 'string',
+                  description: 'Limit results to changes submitted by a specific user (optional)',
+                },
+                forceStreamFlow: {
+                  type: 'boolean',
+                  description: 'Force stream-mode interchanges to ignore expected flow using -F (optional)',
+                },
                 workspacePath: {
                   type: 'string',
                   description: 'Path to workspace directory (optional, defaults to current directory)',
                 },
               },
-              required: ['sourcePath', 'targetPath'],
+              anyOf: [
+                { required: ['sourcePath', 'targetPath'] },
+                { required: ['sourcePath', 'targetPaths'] },
+                { required: ['branch'] },
+                { required: ['stream'] },
+              ],
               additionalProperties: false,
             },
           },
@@ -1224,12 +1357,20 @@ class MCPPerforceServer {
                   type: 'string',
                   description: 'Optional target depot filespec/path',
                 },
+                files: {
+                  type: 'array',
+                  items: { type: 'string' },
+                  description: 'Optional file/filespec list for native p4 integrated filtering',
+                },
                 workspacePath: {
                   type: 'string',
                   description: 'Path to workspace directory (optional, defaults to current directory)',
                 },
               },
-              required: ['sourcePath'],
+              anyOf: [
+                { required: ['sourcePath'] },
+                { required: ['files'] },
+              ],
               additionalProperties: false,
             },
           },
@@ -1343,6 +1484,209 @@ class MCPPerforceServer {
             },
           },
           {
+            name: 'p4.file.inspect',
+            description: 'Composite file inspection: fstat + filelog + optional print/blame in one call',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                filespec: {
+                  type: 'string',
+                  description: 'Single filespec to inspect',
+                },
+                filespecs: {
+                  type: 'array',
+                  items: { type: 'string' },
+                  description: 'Multiple filespecs to inspect in one call',
+                },
+                includeFstat: {
+                  type: 'boolean',
+                  description: 'Include p4 fstat metadata (optional, default true)',
+                },
+                includeHistory: {
+                  type: 'boolean',
+                  description: 'Include p4 filelog history (optional, default true)',
+                },
+                includeContent: {
+                  type: 'boolean',
+                  description: 'Include p4 print content (optional, default false)',
+                },
+                includeBlame: {
+                  type: 'boolean',
+                  description: 'Include p4 annotate/blame output (optional, default false)',
+                },
+                maxFiles: {
+                  type: 'number',
+                  description: 'Maximum files to inspect in one call (optional, default requested count capped at 25)',
+                },
+                maxRevisions: {
+                  type: 'number',
+                  description: 'Maximum revisions per filelog call (optional, default 5)',
+                },
+                workspacePath: {
+                  type: 'string',
+                  description: 'Path to workspace directory (optional, defaults to current directory)',
+                },
+              },
+              anyOf: [
+                { required: ['filespec'] },
+                { required: ['filespecs'] },
+              ],
+              additionalProperties: false,
+            },
+          },
+          {
+            name: 'p4.workspace.snapshot',
+            description: 'Composite workspace snapshot: info + status + optional config/opened/recent changes',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                includeConfig: {
+                  type: 'boolean',
+                  description: 'Include p4.config.detect output (optional, default true)',
+                },
+                includeOpened: {
+                  type: 'boolean',
+                  description: 'Include full p4.opened output (optional, default false)',
+                },
+                includeRecentChanges: {
+                  type: 'boolean',
+                  description: 'Include recent changelists via p4.changes (optional, default false)',
+                },
+                recentChangesMax: {
+                  type: 'number',
+                  description: 'Maximum recent changelists to include (optional, default 10)',
+                },
+                workspacePath: {
+                  type: 'string',
+                  description: 'Path to workspace directory (optional, defaults to current directory)',
+                },
+              },
+              additionalProperties: false,
+            },
+          },
+          {
+            name: 'p4.search.inspect',
+            description: 'Composite search helper: grep + optional fstat + optional content previews',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                pattern: {
+                  type: 'string',
+                  description: 'Search pattern for p4 grep (required)',
+                },
+                filespec: {
+                  type: 'string',
+                  description: 'Single filespec to search',
+                },
+                filespecs: {
+                  type: 'array',
+                  items: { type: 'string' },
+                  description: 'Multiple filespecs to search in one call',
+                },
+                caseInsensitive: {
+                  type: 'boolean',
+                  description: 'Case insensitive search (optional, default false)',
+                },
+                maxFiles: {
+                  type: 'number',
+                  description: 'Maximum matched files to include (optional, default 20)',
+                },
+                maxMatchesPerFile: {
+                  type: 'number',
+                  description: 'Maximum grep matches to retain per file (optional, default 20)',
+                },
+                includeFstat: {
+                  type: 'boolean',
+                  description: 'Include p4 fstat metadata for matched files (optional, default true)',
+                },
+                includeContentPreview: {
+                  type: 'boolean',
+                  description: 'Include p4 print context snippets for matched files (optional, default false)',
+                },
+                previewContextLines: {
+                  type: 'number',
+                  description: 'Context lines before and after each match when includeContentPreview=true (optional, default 2)',
+                },
+                workspacePath: {
+                  type: 'string',
+                  description: 'Path to workspace directory (optional, defaults to current directory)',
+                },
+              },
+              required: ['pattern'],
+              additionalProperties: false,
+            },
+          },
+          {
+            name: 'p4.review.prepare',
+            description: 'Composite review preparation: discover or accept changelists, then build review-ready inspection bundles',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                changelist: {
+                  type: 'string',
+                  description: 'Single changelist to inspect directly',
+                },
+                changelists: {
+                  type: 'array',
+                  items: { type: 'string' },
+                  description: 'Multiple changelists to inspect directly',
+                },
+                status: {
+                  type: 'string',
+                  enum: ['submitted', 'pending', 'shelved'],
+                  description: 'Status filter used when discovering changelists',
+                },
+                user: {
+                  type: 'string',
+                  description: 'User filter used when discovering changelists',
+                },
+                client: {
+                  type: 'string',
+                  description: 'Client/workspace filter used when discovering changelists',
+                },
+                filespec: {
+                  type: 'string',
+                  description: 'Single filespec filter used when discovering changelists',
+                },
+                filespecs: {
+                  type: 'array',
+                  items: { type: 'string' },
+                  description: 'Multiple filespec filters used when discovering changelists',
+                },
+                maxChanges: {
+                  type: 'number',
+                  description: 'Maximum changelists to inspect (optional, default 10)',
+                },
+                includeDiff: {
+                  type: 'boolean',
+                  description: 'Include changelist diff content in each inspection bundle (optional, default false)',
+                },
+                diffFormat: {
+                  type: 'string',
+                  enum: ['u', 'c', 'n', 's'],
+                  description: 'Diff format for inspection describe output when includeDiff=true',
+                },
+                includeFileHistory: {
+                  type: 'boolean',
+                  description: 'Include file history for files touched by each changelist (optional, default false)',
+                },
+                maxFilesWithHistory: {
+                  type: 'number',
+                  description: 'Maximum files per changelist to include history for (optional, default 5)',
+                },
+                maxRevisions: {
+                  type: 'number',
+                  description: 'Maximum revisions per file history call (optional, default 5)',
+                },
+                workspacePath: {
+                  type: 'string',
+                  description: 'Path to workspace directory (optional, defaults to current directory)',
+                },
+              },
+              additionalProperties: false,
+            },
+          },
+          {
             name: 'p4.blame',
             description: 'Show file annotations with change history (like git blame)',
             inputSchema: {
@@ -1352,12 +1696,20 @@ class MCPPerforceServer {
                   type: 'string',
                   description: 'File to show blame for (required)',
                 },
+                files: {
+                  type: 'array',
+                  items: { type: 'string' },
+                  description: 'Files to show blame for in one command (required if file is omitted)',
+                },
                 workspacePath: {
                   type: 'string',
                   description: 'Path to workspace directory (optional, defaults to current directory)',
                 },
               },
-              required: ['file'],
+              anyOf: [
+                { required: ['file'] },
+                { required: ['files'] },
+              ],
               additionalProperties: false,
             },
           },
@@ -1371,12 +1723,20 @@ class MCPPerforceServer {
                   type: 'string',
                   description: 'File to annotate (required)',
                 },
+                files: {
+                  type: 'array',
+                  items: { type: 'string' },
+                  description: 'Files to annotate in one command (required if file is omitted)',
+                },
                 workspacePath: {
                   type: 'string',
                   description: 'Path to workspace directory (optional, defaults to current directory)',
                 },
               },
-              required: ['file'],
+              anyOf: [
+                { required: ['file'] },
+                { required: ['files'] },
+              ],
               additionalProperties: false,
             },
           },
@@ -1499,6 +1859,11 @@ class MCPPerforceServer {
                   type: 'string',
                   description: 'Depot filespec to print (required)',
                 },
+                filespecs: {
+                  type: 'array',
+                  items: { type: 'string' },
+                  description: 'Depot filespecs to print in one command (required if filespec is omitted)',
+                },
                 quiet: {
                   type: 'boolean',
                   description: 'Suppress file headers (optional, defaults to true)',
@@ -1508,7 +1873,10 @@ class MCPPerforceServer {
                   description: 'Path to workspace directory (optional, defaults to current directory)',
                 },
               },
-              required: ['filespec'],
+              anyOf: [
+                { required: ['filespec'] },
+                { required: ['filespecs'] },
+              ],
               additionalProperties: false,
             },
           },
@@ -1522,16 +1890,64 @@ class MCPPerforceServer {
                   type: 'string',
                   description: 'Filespec to inspect (required)',
                 },
+                filespecs: {
+                  type: 'array',
+                  items: { type: 'string' },
+                  description: 'Filespecs to inspect in one command (required if filespec is omitted)',
+                },
                 max: {
                   type: 'number',
                   description: 'Maximum number of results (optional)',
+                },
+                filter: {
+                  type: 'string',
+                  description: 'fstat filter expression for -F (optional)',
+                },
+                fields: {
+                  type: 'array',
+                  items: { type: 'string' },
+                  description: 'Specific tagged fields to return using -T (optional)',
+                },
+                reverseOrder: {
+                  type: 'boolean',
+                  description: 'Reverse the output sort order using -r (optional)',
+                },
+                attributePattern: {
+                  type: 'string',
+                  description: 'Restrict attributes using -A pattern (optional)',
+                },
+                changeAfter: {
+                  type: 'string',
+                  description: 'Show files modified by or after a submitted changelist using -c (optional)',
+                },
+                changelist: {
+                  type: 'string',
+                  description: 'Show files modified by a specific changelist using -e (optional)',
+                },
+                outputOptions: {
+                  type: 'array',
+                  items: { type: 'string' },
+                  description: 'Raw -O option suffixes such as l, p, r, s (optional)',
+                },
+                limitOptions: {
+                  type: 'array',
+                  items: { type: 'string' },
+                  description: 'Raw -R option suffixes such as c, h, o, u (optional)',
+                },
+                sortOptions: {
+                  type: 'array',
+                  items: { type: 'string' },
+                  description: 'Raw -S option suffixes such as d, h, r, s, t (optional)',
                 },
                 workspacePath: {
                   type: 'string',
                   description: 'Path to workspace directory (optional, defaults to current directory)',
                 },
               },
-              required: ['filespec'],
+              anyOf: [
+                { required: ['filespec'] },
+                { required: ['filespecs'] },
+              ],
               additionalProperties: false,
             },
           },
@@ -1544,6 +1960,24 @@ class MCPPerforceServer {
                 stream: {
                   type: 'string',
                   description: 'Optional stream path filter',
+                },
+                streams: {
+                  type: 'array',
+                  items: { type: 'string' },
+                  description: 'Optional stream path filters to query in one command',
+                },
+                unloaded: {
+                  type: 'boolean',
+                  description: 'Include unloaded task streams using -U (optional)',
+                },
+                filter: {
+                  type: 'string',
+                  description: 'Stream filter expression for -F (optional)',
+                },
+                viewMatch: {
+                  type: 'array',
+                  items: { type: 'string' },
+                  description: 'One or more depot paths to pass with --viewmatch (optional)',
                 },
                 max: {
                   type: 'number',
@@ -1590,6 +2024,11 @@ class MCPPerforceServer {
                   type: 'string',
                   description: 'Filespec to search in (optional)',
                 },
+                filespecs: {
+                  type: 'array',
+                  items: { type: 'string' },
+                  description: 'Filespecs to search in (optional)',
+                },
                 caseInsensitive: {
                   type: 'boolean',
                   description: 'Case insensitive search (optional, defaults to false)',
@@ -1613,9 +2052,30 @@ class MCPPerforceServer {
                   type: 'string',
                   description: 'Filespec to list (optional, defaults to all files)',
                 },
+                filespecs: {
+                  type: 'array',
+                  items: { type: 'string' },
+                  description: 'Filespecs to list in one command (optional)',
+                },
                 max: {
                   type: 'number',
                   description: 'Maximum number of results (optional)',
+                },
+                allRevisions: {
+                  type: 'boolean',
+                  description: 'Display all revisions in range using -a (optional)',
+                },
+                archiveDepot: {
+                  type: 'boolean',
+                  description: 'Include files in archive depots using -A (optional)',
+                },
+                existingOnly: {
+                  type: 'boolean',
+                  description: 'Show only revisions available for sync/integrate using -e (optional)',
+                },
+                ignoreCase: {
+                  type: 'boolean',
+                  description: 'Ignore case of the file argument using -i (optional)',
                 },
                 workspacePath: {
                   type: 'string',
@@ -1634,6 +2094,31 @@ class MCPPerforceServer {
                 filespec: {
                   type: 'string',
                   description: 'Filespec to list directories for (optional, defaults to all directories)',
+                },
+                filespecs: {
+                  type: 'array',
+                  items: { type: 'string' },
+                  description: 'Filespecs to list directories for in one command (optional)',
+                },
+                ignoreCase: {
+                  type: 'boolean',
+                  description: 'Ignore case using -i (optional; incompatible with onlyClientMapped)',
+                },
+                onlyClientMapped: {
+                  type: 'boolean',
+                  description: 'List only directories in the current client view using -C (optional)',
+                },
+                includeDeleted: {
+                  type: 'boolean',
+                  description: 'Include directories containing only deleted files using -D (optional)',
+                },
+                onlyHave: {
+                  type: 'boolean',
+                  description: 'List directories containing files synced to the current workspace using -H (optional)',
+                },
+                stream: {
+                  type: 'string',
+                  description: 'Limit to directories mapped in a stream view using -S (optional)',
                 },
                 workspacePath: {
                   type: 'string',
@@ -1654,9 +2139,18 @@ class MCPPerforceServer {
                   type: 'string',
                   description: 'Specific user to show (optional)',
                 },
+                users: {
+                  type: 'array',
+                  items: { type: 'string' },
+                  description: 'Specific users to show in one command (optional)',
+                },
                 max: {
                   type: 'number',
                   description: 'Maximum number of results (optional)',
+                },
+                includeServiceUsers: {
+                  type: 'boolean',
+                  description: 'Include service and operator users using -a (optional)',
                 },
                 workspacePath: {
                   type: 'string',
@@ -1712,6 +2206,23 @@ class MCPPerforceServer {
                   type: 'string',
                   description: 'Specific job to show (optional)',
                 },
+                files: {
+                  type: 'array',
+                  items: { type: 'string' },
+                  description: 'Optional file/filespec filters for jobs',
+                },
+                jobView: {
+                  type: 'string',
+                  description: 'Jobview expression for -e (optional)',
+                },
+                includeIntegrated: {
+                  type: 'boolean',
+                  description: 'Include fixes from integrated changelists using -i (optional)',
+                },
+                reverseOrder: {
+                  type: 'boolean',
+                  description: 'Reverse job sort order using -r (optional)',
+                },
                 max: {
                   type: 'number',
                   description: 'Maximum number of results (optional)',
@@ -1757,6 +2268,11 @@ class MCPPerforceServer {
                   type: 'string',
                   description: 'Filter by changelist (optional)',
                 },
+                files: {
+                  type: 'array',
+                  items: { type: 'string' },
+                  description: 'Optional file/filespec filters for fixes',
+                },
                 workspacePath: {
                   type: 'string',
                   description: 'Path to workspace directory (optional, defaults to current directory)',
@@ -1778,6 +2294,39 @@ class MCPPerforceServer {
                 user: {
                   type: 'string',
                   description: 'Filter by user (optional)',
+                },
+                filespec: {
+                  type: 'string',
+                  description: 'Single filespec filter for labels containing matching files (optional)',
+                },
+                filespecs: {
+                  type: 'array',
+                  items: { type: 'string' },
+                  description: 'Multiple filespec filters for labels in one command (optional)',
+                },
+                nameFilter: {
+                  type: 'string',
+                  description: 'Label name filter using -e (optional)',
+                },
+                caseInsensitiveNameFilter: {
+                  type: 'string',
+                  description: 'Case-insensitive label name filter using -E (optional)',
+                },
+                unloaded: {
+                  type: 'boolean',
+                  description: 'List unloaded labels using -U (optional)',
+                },
+                autoreloadOnly: {
+                  type: 'boolean',
+                  description: 'List only autoreload labels using -R (optional)',
+                },
+                allServers: {
+                  type: 'boolean',
+                  description: 'List labels across all servers using -a (optional)',
+                },
+                serverId: {
+                  type: 'string',
+                  description: 'Limit labels to a specific server using -s (optional)',
                 },
                 max: {
                   type: 'number',
@@ -1820,6 +2369,31 @@ class MCPPerforceServer {
                   type: 'string',
                   description: 'Filespec to get sizes for (optional, defaults to current directory)',
                 },
+                filespecs: {
+                  type: 'array',
+                  items: { type: 'string' },
+                  description: 'Filespecs to get sizes for in one command (optional)',
+                },
+                allRevisions: {
+                  type: 'boolean',
+                  description: 'List all revisions in the range using -a (optional)',
+                },
+                shelvedOnly: {
+                  type: 'boolean',
+                  description: 'Display size info for shelved files only using -S (optional)',
+                },
+                omitLazyCopies: {
+                  type: 'boolean',
+                  description: 'Omit lazy copies from totals using -z (optional)',
+                },
+                max: {
+                  type: 'number',
+                  description: 'Limit output to the first max files using -m (optional)',
+                },
+                blockSize: {
+                  type: 'number',
+                  description: 'Round sizes up to a block size in bytes using -b (optional)',
+                },
                 workspacePath: {
                   type: 'string',
                   description: 'Path to workspace directory (optional, defaults to current directory)',
@@ -1837,6 +2411,11 @@ class MCPPerforceServer {
                 filespec: {
                   type: 'string',
                   description: 'Filespec to check (optional)',
+                },
+                filespecs: {
+                  type: 'array',
+                  items: { type: 'string' },
+                  description: 'Filespecs to check in one command (optional)',
                 },
                 workspacePath: {
                   type: 'string',

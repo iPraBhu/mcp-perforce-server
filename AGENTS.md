@@ -21,8 +21,12 @@ This document describes all available agents (tools) provided by the MCP Perforc
 #### `p4.sync`
 **Description**: Sync files from the depot to workspace  
 **Parameters**:
-- `files` (optional): Specific files or patterns to sync
+- `filespec` (optional): Single filespec to sync
+- `filespecs` (optional): Multiple filespecs to sync in one command
 - `force` (optional): Force sync even if files are opened
+- `preview` / `summaryPreview` (optional): Preview full sync or summary-only preview
+- `metadataOnly` / `safeSync` / `populateOnly` (optional): Native `-k`, `-s`, or `-p` sync modes
+- `quiet`, `reopenMoved`, `useListOptimization`, `max`, `parallel` (optional): Additional native sync controls
 - `workspacePath` (optional): Path to workspace directory  
 **Returns**: Sync results with file statistics
 
@@ -30,13 +34,15 @@ This document describes all available agents (tools) provided by the MCP Perforc
 **Description**: List all opened files in the workspace  
 **Parameters**:
 - `changelist` (optional): Filter by changelist number
+- `files` (optional): Limit the result to specific files/filespecs
 - `workspacePath` (optional): Path to workspace directory  
 **Returns**: List of opened files with their status and changelist information
 
 #### `p4.have`
 **Description**: List files that are synced to the workspace  
 **Parameters**:
-- `files` (optional): Specific files or patterns to check
+- `filespec` (optional): Single filespec to check
+- `filespecs` (optional): Multiple filespecs to check in one command
 - `workspacePath` (optional): Path to workspace directory  
 **Returns**: List of synced files with revision information
 
@@ -137,14 +143,16 @@ This document describes all available agents (tools) provided by the MCP Perforc
 #### `p4.blame`
 **Description**: Show file annotations (like git blame)  
 **Parameters**:
-- `file`: File to annotate
+- `file` (optional): Single file to annotate
+- `files` (optional): Multiple files to annotate in one command
 - `workspacePath` (optional): Path to workspace directory  
 **Returns**: Line-by-line attribution showing who last changed each line
 
 #### `p4.annotate`
 **Description**: Alias for file annotations (`p4.blame`)  
 **Parameters**:
-- `file`: File to annotate
+- `file` (optional): Single file to annotate
+- `files` (optional): Multiple files to annotate in one command
 - `workspacePath` (optional): Path to workspace directory  
 **Returns**: Line-by-line attribution showing who last changed each line
 
@@ -220,6 +228,8 @@ This document describes all available agents (tools) provided by the MCP Perforc
 - `user` (optional): Filter by user
 - `client` (optional): Filter by client/workspace
 - `status` (optional): Filter by status (pending, submitted, etc.)
+- `filespec` (optional): Single filespec filter
+- `filespecs` (optional): Multiple filespec filters in one command
 - `workspacePath` (optional): Path to workspace directory  
 **Returns**: List of changelists matching criteria
 
@@ -242,18 +252,20 @@ This document describes all available agents (tools) provided by the MCP Perforc
 #### `p4.interchanges`
 **Description**: List changelists not yet integrated between two paths  
 **Parameters**:
-- `sourcePath`: Source depot path/filespec
-- `targetPath`: Target depot path/filespec
+- `sourcePath` / `targetPath` / `targetPaths`: Direct path mode
+- `branch` with optional `sourcePath`, `targetPath`, `targetPaths`, `useBranchSource`: Native branch-spec modes
+- `stream` with optional `parentStream`, `targetPath`, `targetPaths`, `forceStreamFlow`: Native stream mode
 - `max` (optional): Maximum changelists to return
-- `longDescription` (optional): Include long descriptions (`-l`)
+- `longDescription`, `reverse`, `time`, `user` (optional): Additional native output and filter flags
 - `workspacePath` (optional): Path to workspace directory  
 **Returns**: Changelists eligible for integration
 
 #### `p4.integrated`
 **Description**: Show integration history between source and target  
 **Parameters**:
-- `sourcePath`: Source depot path/filespec
+- `sourcePath` (optional): Source depot path/filespec
 - `targetPath` (optional): Target depot path/filespec
+- `files` (optional): Native file/filespec filters for `p4 integrated`
 - `workspacePath` (optional): Path to workspace directory  
 **Returns**: Integration history records
 
@@ -293,13 +305,60 @@ This document describes all available agents (tools) provided by the MCP Perforc
 - `workspacePath` (optional): Path to workspace directory  
 **Returns**: Aggregated drift and sync-state summary plus forward/reverse step details
 
+#### `p4.file.inspect`
+**Description**: MCP-only composite file inspection helper  
+**Parameters**:
+- `filespec` / `filespecs`: One or more files to inspect
+- `includeFstat` (optional): Include metadata from `p4.fstat` (default true)
+- `includeHistory` (optional): Include history from `p4.filelog` (default true)
+- `includeContent` (optional): Include file content from `p4.print`
+- `includeBlame` (optional): Include line attribution from `p4.blame`
+- `maxFiles` / `maxRevisions` (optional): Caps for composite subcalls
+- `workspacePath` (optional): Path to workspace directory  
+**Returns**: Per-file bundle of metadata, history, optional content, and optional blame output
+
+#### `p4.workspace.snapshot`
+**Description**: MCP-only composite workspace context helper  
+**Parameters**:
+- `includeConfig` (optional): Include `p4.config.detect` output (default true)
+- `includeOpened` (optional): Include full `p4.opened` output
+- `includeRecentChanges` (optional): Include recent changelists via `p4.changes`
+- `recentChangesMax` (optional): Max changelists included when `includeRecentChanges=true`
+- `workspacePath` (optional): Path to workspace directory  
+**Returns**: Aggregated workspace info, status, optional config, optional opened files, and optional recent changes
+
+#### `p4.search.inspect`
+**Description**: MCP-only composite search helper for code-aware search results  
+**Parameters**:
+- `pattern`: Search pattern for `p4.grep`
+- `filespec` / `filespecs` (optional): One or more filespec filters
+- `caseInsensitive` (optional): Case insensitive search
+- `maxFiles` / `maxMatchesPerFile` (optional): Caps for returned matched files and per-file matches
+- `includeFstat` (optional): Include file metadata from `p4.fstat` (default true)
+- `includeContentPreview` (optional): Include matched context snippets from `p4.print`
+- `previewContextLines` (optional): Context lines around each match (default 2)
+- `workspacePath` (optional): Path to workspace directory  
+**Returns**: Grouped search hits with optional file metadata and optional surrounding content snippets
+
+#### `p4.review.prepare`
+**Description**: MCP-only review preparation helper for building review-ready changelist bundles  
+**Parameters**:
+- `changelist` / `changelists` (optional): Explicit changelists to inspect directly
+- `status`, `user`, `client`, `filespec`, `filespecs` (optional): Discovery filters when explicit changelists are not provided
+- `maxChanges` (optional): Maximum changelists to inspect
+- `includeDiff` / `diffFormat` (optional): Include diff content in each changelist inspection bundle
+- `includeFileHistory`, `maxFilesWithHistory`, `maxRevisions` (optional): Include `p4.filelog` context per change
+- `workspacePath` (optional): Path to workspace directory  
+**Returns**: Review-ready list of changelists, each with an embedded `p4.change.inspect` bundle plus optional discovery step output
+
 ### Search & Discovery
 
 #### `p4.grep`
 **Description**: Search for text patterns across files  
 **Parameters**:
 - `pattern`: Regular expression pattern to search for
-- `files` (optional): File patterns to search in
+- `filespec` (optional): Single filespec to search in
+- `filespecs` (optional): Multiple filespecs to search in one command
 - `caseInsensitive` (optional): Case insensitive search
 - `workspacePath` (optional): Path to workspace directory  
 **Returns**: Search results with file locations and matching lines
@@ -307,37 +366,46 @@ This document describes all available agents (tools) provided by the MCP Perforc
 #### `p4.files`
 **Description**: List files in depot with metadata  
 **Parameters**:
-- `path`: Depot path to list files from
+- `filespec` (optional): Single depot filespec to list from
+- `filespecs` (optional): Multiple depot filespecs to list in one command
+- `allRevisions`, `archiveDepot`, `existingOnly`, `ignoreCase` (optional): Native `p4 files` flags
 - `workspacePath` (optional): Path to workspace directory  
 **Returns**: File list with revision, size, and type information
 
 #### `p4.dirs`
 **Description**: List directories in depot  
 **Parameters**:
-- `path`: Depot path to list directories from
+- `filespec` (optional): Single depot filespec to list directories from
+- `filespecs` (optional): Multiple depot filespecs to list directories from in one command
+- `ignoreCase`, `onlyClientMapped`, `includeDeleted`, `onlyHave`, `stream` (optional): Native `p4 dirs` flags
 - `workspacePath` (optional): Path to workspace directory  
 **Returns**: Directory listing
 
 #### `p4.filelog`
 **Description**: Show file revision history  
 **Parameters**:
-- `file`: File to show history for
-- `max` (optional): Maximum revisions to show
+- `filespec` (optional): Single filespec to show history for
+- `filespecs` (optional): Multiple filespecs to show history for in one command
+- `maxRevisions` (optional): Maximum revisions to show
 - `workspacePath` (optional): Path to workspace directory  
 **Returns**: Revision history with changelist information
 
 #### `p4.fstat`
 **Description**: Show file metadata (`p4 fstat`)  
 **Parameters**:
-- `filespec`: Filespec to inspect
+- `filespec` (optional): Single filespec to inspect
+- `filespecs` (optional): Multiple filespecs to inspect in one command
 - `max` (optional): Maximum results
+- `filter`, `fields`, `reverseOrder`, `attributePattern`, `changeAfter`, `changelist` (optional): Common native `p4 fstat` selectors
+- `outputOptions`, `limitOptions`, `sortOptions` (optional): Raw `-O*`, `-R*`, `-S*` option suffixes
 - `workspacePath` (optional): Path to workspace directory  
 **Returns**: Structured metadata records for matching files
 
 #### `p4.print`
 **Description**: Print depot file content (`p4 print`)  
 **Parameters**:
-- `filespec`: Filespec to print
+- `filespec` (optional): Single filespec to print
+- `filespecs` (optional): Multiple filespecs to print in one command
 - `quiet` (optional, default true): Suppress headers
 - `workspacePath` (optional): Path to workspace directory  
 **Returns**: Printed file content
@@ -347,6 +415,9 @@ This document describes all available agents (tools) provided by the MCP Perforc
 #### `p4.users`
 **Description**: List Perforce users  
 **Parameters**:
+- `user` (optional): Single user filter
+- `users` (optional): Multiple user filters in one command
+- `includeServiceUsers` (optional): Include service/operator users via `-a`
 - `workspacePath` (optional): Path to workspace directory  
 **Returns**: List of users with their details
 
@@ -361,6 +432,7 @@ This document describes all available agents (tools) provided by the MCP Perforc
 **Description**: List workspaces/clients  
 **Parameters**:
 - `user` (optional): Filter by user
+- `stream`, `nameFilter`, `caseInsensitiveNameFilter`, `unloaded`, `allServers`, `serverId` (optional): Additional native `p4 clients` filters
 - `max` (optional): Maximum number of results
 - `workspacePath` (optional): Path to workspace directory  
 **Returns**: List of client workspaces
@@ -377,6 +449,9 @@ This document describes all available agents (tools) provided by the MCP Perforc
 #### `p4.jobs`
 **Description**: List jobs (if job tracking is enabled)  
 **Parameters**:
+- `job` (optional): Specific job to show
+- `files` (optional): File/filespec filters
+- `jobView`, `includeIntegrated`, `reverseOrder` (optional): Additional native `p4 jobs` filters
 - `workspacePath` (optional): Path to workspace directory  
 **Returns**: List of jobs
 
@@ -392,6 +467,7 @@ This document describes all available agents (tools) provided by the MCP Perforc
 **Parameters**:
 - `changelist` (optional): Filter by changelist
 - `job` (optional): Filter by job
+- `files` (optional): File/filespec filters
 - `workspacePath` (optional): Path to workspace directory  
 **Returns**: Relationships between changelists and jobs
 
@@ -400,6 +476,9 @@ This document describes all available agents (tools) provided by the MCP Perforc
 #### `p4.labels`
 **Description**: List labels  
 **Parameters**:
+- `label`, `user`, `max` (optional): Existing filters
+- `filespec` / `filespecs` (optional): Filter labels containing matching files
+- `nameFilter`, `caseInsensitiveNameFilter`, `unloaded`, `autoreloadOnly`, `allServers`, `serverId` (optional): Additional native `p4 labels` flags
 - `workspacePath` (optional): Path to workspace directory  
 **Returns**: List of labels
 
@@ -413,7 +492,9 @@ This document describes all available agents (tools) provided by the MCP Perforc
 #### `p4.streams`
 **Description**: List streams  
 **Parameters**:
-- `stream` (optional): Stream path filter
+- `stream` (optional): Single stream path filter
+- `streams` (optional): Multiple stream path filters in one command
+- `unloaded`, `filter`, `viewMatch` (optional): Additional native `p4 streams` selectors
 - `max` (optional): Maximum results
 - `workspacePath` (optional): Path to workspace directory  
 **Returns**: List of streams
@@ -430,7 +511,9 @@ This document describes all available agents (tools) provided by the MCP Perforc
 #### `p4.sizes`
 **Description**: Get file size and disk usage statistics  
 **Parameters**:
-- `files` (optional): Specific files or patterns
+- `filespec` (optional): Single filespec or pattern
+- `filespecs` (optional): Multiple filespecs or patterns in one command
+- `allRevisions`, `shelvedOnly`, `omitLazyCopies`, `max`, `blockSize` (optional): Additional native `p4 sizes` controls
 - `workspacePath` (optional): Path to workspace directory  
 **Returns**: Size statistics and disk usage information
 

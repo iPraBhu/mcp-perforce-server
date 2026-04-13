@@ -6,24 +6,34 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-Ready-blue)](https://www.typescriptlang.org/)
 [![MCPAmpel](https://img.shields.io/endpoint?url=https://mcpampel.com/badge/iPraBhu/mcp-perforce-server.json)](https://mcpampel.com/repo/iPraBhu/mcp-perforce-server)
 
-MCP server for Perforce (P4) with safe defaults, fast execution, and structured JSON responses.
+`mcp-perforce-server` is a Model Context Protocol server for Perforce (`p4`) with safe defaults, structured JSON responses, and both native-style and MCP-optimized workflows.
 
-> Developed with vibe coding for practical Perforce automation workflows.
+It is designed for AI assistants and IDE integrations that need Perforce access without relying on brittle shell scripting.
 
-New to MCP servers? See [What is MCP (Model Context Protocol)?](https://adevguide.com/ai-engineering/llm-agents/what-is-mcp-model-context-protocol/).
+## What It Provides
 
-## Workflow Speed
+- 59 MCP tools across repository inspection, file operations, changelists, reviews, jobs, labels, streams, analytics, and compliance.
+- Safe-by-default runtime behavior:
+  - `P4_READONLY_MODE=true`
+  - `P4_DISABLE_DELETE=true`
+- Batch-capable inputs for the tool surface where native `p4` supports multi-target usage.
+- MCP-specific composite helpers that reduce round trips for common review and search workflows.
+- Structured responses with `ok`, `result`, optional `error`, optional `warnings`, and `configUsed`.
+- Compatibility with both dot and underscore tool naming:
+  - `p4.changes`
+  - `p4_changes`
 
-This server includes composite tools that combine multiple Perforce calls into one request so review and sync workflows complete faster with fewer MCP round trips.
+## Highlighted Workflows
 
-- `p4.review.bundle`: pending review changelists with optional details and reviewers in one call
-- `p4.change.inspect`: changelist inspection bundle (`describe` + `fixes` + `reviews` + optional diff + optional `filelog`)
-- `p4.path.synccheck`: branch/path sync drift analysis (`interchanges` + optional `integrated`)
+The server includes higher-level helpers on top of raw `p4` commands.
 
-To return actual changelist diff content via MCP:
-
-- `p4.describe` with `includeDiff=true` (optional `diffFormat`: `u`, `c`, `n`, `s`)
-- `p4.change.inspect` with `includeDiff=true`
+- `p4.review.bundle`: pending review changelists with optional details and reviewers
+- `p4.change.inspect`: `describe` + `fixes` + `reviews` + optional diff + optional file history
+- `p4.path.synccheck`: drift and sync-state analysis between two depot paths
+- `p4.file.inspect`: per-file metadata, history, optional content, and optional blame
+- `p4.workspace.snapshot`: workspace info, status, optional config, opened files, and recent changes
+- `p4.search.inspect`: grouped search results with optional file metadata and content previews
+- `p4.review.prepare`: explicit or discovered changelists prepared into review-ready bundles
 
 ## Install
 
@@ -31,22 +41,29 @@ To return actual changelist diff content via MCP:
 npm install -g mcp-perforce-server
 ```
 
+Requirements:
+
+- Node.js 18+
+- Perforce CLI available as `p4` or `p4.exe`
+- Valid Perforce environment via `.p4config` or MCP `env`
+
 ## Quick Start
 
-1. Make sure `p4` is installed and available in `PATH`.
-2. Configure Perforce credentials using either `.p4config` in your workspace/project root, or MCP `env` variables.
-3. Add MCP server config in your IDE/client.
+1. Install the Perforce CLI and ensure `p4` is on `PATH`.
+2. Configure Perforce credentials in `.p4config` or via MCP `env`.
+3. Add the server to your MCP client.
+4. Start in the default safe profile before enabling any write-capable tools.
 
-### Example `.p4config`
+Example `.p4config`:
 
 ```ini
-P4PORT=perforce-server:1666
+P4PORT=ssl:perforce.example.com:1666
 P4USER=your-username
 P4CLIENT=your-workspace-name
-P4PASSWD=your-password
+P4PASSWD=your-password-or-ticket
 ```
 
-### Global Install MCP Config (Default Safe Profile)
+Example MCP config using the globally installed server:
 
 ```json
 {
@@ -58,20 +75,7 @@ P4PASSWD=your-password
 }
 ```
 
-### Local Repo MCP Config (Default Safe Profile)
-
-```json
-{
-  "mcpServers": {
-    "perforce": {
-      "command": "node",
-      "args": ["/absolute/path/to/mcp-perforce-server/dist/server.js"]
-    }
-  }
-}
-```
-
-### MCP Config (Default Safe Profile + Credentials in `env`)
+Example MCP config with explicit credentials:
 
 ```json
 {
@@ -82,33 +86,16 @@ P4PASSWD=your-password
         "P4PORT": "ssl:perforce.example.com:1666",
         "P4USER": "your-username",
         "P4CLIENT": "your-workspace-name",
-        "P4PASSWD": "your-password-or-ticket"
-      }
-    }
-  }
-}
-```
-
-Defaults are already safe: `P4_READONLY_MODE=true` and `P4_DISABLE_DELETE=true` unless explicitly set to `false`.
-
-If you want to pin these explicitly in your client config:
-
-```json
-{
-  "mcpServers": {
-    "perforce": {
-      "command": "mcp-perforce-server",
-      "env": {
+        "P4PASSWD": "your-password-or-ticket",
         "P4_READONLY_MODE": "true",
-        "P4_DISABLE_DELETE": "true",
-        "LOG_LEVEL": "error"
+        "P4_DISABLE_DELETE": "true"
       }
     }
   }
 }
 ```
 
-Windows `args` example:
+Windows local-repo example:
 
 ```json
 {
@@ -121,87 +108,71 @@ Windows `args` example:
 }
 ```
 
-## Default Access Model
+## Safety Model
+
+The default runtime profile is conservative.
 
 | Setting | Default | Effect |
 |---|---|---|
-| `P4_READONLY_MODE` | `true` | Blocks all write-capable tools. |
+| `P4_READONLY_MODE` | `true` | Blocks write-capable tools. |
 | `P4_DISABLE_DELETE` | `true` | Blocks `p4.delete` even when write mode is enabled. |
 
-Write-capable tools blocked when `P4_READONLY_MODE=true`:
+Write-capable tools include:
 
-| Tool |
-|---|
-| `p4.add`, `p4.edit`, `p4.delete`, `p4.revert`, `p4.sync` |
-| `p4.changelist.create`, `p4.changelist.update`, `p4.changelist.submit`, `p4.submit` |
-| `p4.resolve`, `p4.shelve`, `p4.unshelve` |
-| `p4.copy`, `p4.move`, `p4.integrate`, `p4.merge` |
+- `p4.add`, `p4.edit`, `p4.delete`, `p4.revert`, `p4.sync`
+- `p4.changelist.create`, `p4.changelist.update`, `p4.changelist.submit`, `p4.submit`
+- `p4.resolve`, `p4.shelve`, `p4.unshelve`
+- `p4.copy`, `p4.move`, `p4.integrate`, `p4.merge`
 
-## Server Configuration Reference
+## Tool Surface
 
-### Runtime, Safety, and Performance
+Major categories:
 
-| Variable | Default | Description |
+- Repository and workspace inspection
+- File operations and diffing
+- Changelists and submissions
+- Merge, shelving, and resolve flows
+- Search and discovery
+- Review and workflow composites
+- Users, clients, streams, labels, jobs, and fixes
+- Compliance, audit, and operational diagnostics
+
+Notable native parity improvements:
+
+- Batch-style inputs for commands such as `sync`, `opened`, `filelog`, `annotate`, `grep`, `files`, `dirs`, `print`, `fstat`, `sizes`, `have`, `users`, `streams`, `jobs`, and `fixes`
+- Expanded native flag coverage for tools such as `sync`, `interchanges`, `fstat`, `files`, `dirs`, `streams`, `clients`, `labels`, `jobs`, and `sizes`
+- Support for both workspace-facing and depot-to-depot diffing via `p4.diff` and `p4.diff2`
+
+## Configuration
+
+Most installations only need a small set of variables.
+
+| Variable | Default | Purpose |
 |---|---|---|
-| `P4_READONLY_MODE` | `true` | Read-only by default. Set to `false` to enable write-capable tools. |
-| `P4_DISABLE_DELETE` | `true` | Delete operations are disabled by default. Set to `false` to allow `p4.delete`. |
-| `P4_PATH` | `p4` / `p4.exe` | Custom path to Perforce CLI executable. |
-| `P4CONFIG` | `.p4config` | `.p4config` file name used for upward discovery. |
-| `LOG_LEVEL` | `warn` | Logging level: `error`, `warn`, `info`, `debug`. |
-| `P4_PRETTY_JSON` | `false` | Pretty-print JSON responses when `true`. |
+| `P4_READONLY_MODE` | `true` | Keep the server read-only by default. |
+| `P4_DISABLE_DELETE` | `true` | Prevent delete operations unless explicitly enabled. |
+| `P4CONFIG` | `.p4config` | Config file name used during upward discovery. |
+| `P4_PATH` | `p4` / `p4.exe` | Custom path to the Perforce CLI. |
 | `P4_PERFORMANCE_MODE` | `fast` | Preset: `fast`, `balanced`, `secure`. |
-| `P4_TIMEOUT_MS` | `5000` / `10000` / `15000` | Command timeout in ms (`fast` / `balanced` / `secure`). |
-| `P4_CONFIG_CACHE_TTL` | `600000` / `300000` / `300000` | `.p4config` cache TTL in ms (`fast` / `balanced` / `secure`). |
-| `P4_RESPONSE_CACHE` | `true` | Enable/disable read-result response cache. |
-| `P4_RESPONSE_CACHE_TTL_MS` | `5000` / `3000` / `1000` | Response cache TTL in ms (`fast` / `balanced` / `secure`). |
-| `P4_RESPONSE_CACHE_TTL_MAP` | unset | Per-tool cache TTL overrides (for example `p4.info=30000,p4.review=2000`). |
-| `P4_RESPONSE_CACHE_MAX_ENTRIES` | `400` / `250` / `100` | Max cached read responses (`fast` / `balanced` / `secure`). |
-| `P4_NEGATIVE_CACHE` | `true` | Cache predictable read errors for a short TTL to avoid repeated retries. |
-| `P4_NEGATIVE_CACHE_TTL_MS` | `5000` | Negative-cache TTL in milliseconds. |
-| `P4_WORKFLOW_CONCURRENCY` | `6` | Max concurrent subcalls used by composite workflow tools. |
-| `P4_LOG_PERF_METRICS` | `false` | Enable periodic performance snapshots (cache hit rate, p50/p95 latency, subcall totals). |
-| `P4_LOG_PERF_METRICS_INTERVAL_MS` | `60000` | Interval for performance snapshot logs in milliseconds. |
-| `P4_PERF_METRICS_SAMPLE_SIZE` | `200` | Rolling sample size per tool used to compute p50/p95 latency. |
-| `P4_ENABLE_AUDIT_LOGGING` | `false` / `false` / `true` | Override audit logging (`fast` / `balanced` / `secure`). |
-| `P4_ENABLE_RATE_LIMITING` | `false` / `false` / `true` | Override rate limiting (`fast` / `balanced` / `secure`). |
-| `P4_ENABLE_MEMORY_LIMITS` | `false` / `true` / `true` | Override memory-limit checks (`fast` / `balanced` / `secure`). |
-| `P4_ENABLE_INPUT_SANITIZATION` | `true` | Input sanitization is enabled unless set to `false`. |
-| `P4_MAX_MEMORY_MB` | `512` | Memory limit for command execution and checks. |
-| `P4_AUDIT_RETENTION_DAYS` | `90` | Number of days audit entries are retained. |
-| `P4_RATE_LIMIT_REQUESTS` | `100` | Max requests per rate-limit window. |
-| `P4_RATE_LIMIT_WINDOW_MS` | `600000` | Rate-limit window in milliseconds. |
-| `P4_RATE_LIMIT_BLOCK_MS` | `3600000` | Block duration in milliseconds after exceeding limit. |
+| `P4_WORKFLOW_CONCURRENCY` | `6` | Max concurrent subcalls for composite tools. |
+| `P4_RESPONSE_CACHE` | `true` | Enable read-response caching. |
+| `P4_RESPONSE_CACHE_TTL_MAP` | unset | Per-tool cache TTL overrides. |
+| `LOG_LEVEL` | `warn` | Server log level. |
 
-### Perforce Connection Variables
+Perforce connection variables:
 
-| Variable | Required | Description |
-|---|---|---|
-| `P4PORT` | Yes | Perforce server address (for example `ssl:perforce.example.com:1666`). |
-| `P4USER` | Yes | Perforce username. |
-| `P4CLIENT` | Yes | Perforce client/workspace name. |
-| `P4PASSWD` | No | Password or ticket (masked in server output). |
-| `P4CHARSET` | No | Character set (for example `utf8`). |
-| `P4COMMANDCHARSET` | No | Command charset override. |
-| `P4LANGUAGE` | No | Localized language setting. |
-| `P4DIFF` | No | Custom diff tool command. |
-| `P4MERGE` | No | Custom merge tool command. |
-| `P4EDITOR` | No | Editor for changelist descriptions/spec forms. |
+- `P4PORT`
+- `P4USER`
+- `P4CLIENT`
+- `P4PASSWD`
+- `P4CHARSET`
+- `P4COMMANDCHARSET`
+- `P4LANGUAGE`
 
-## Tool Coverage
+For full configuration tables and examples, see:
 
-- 55 MCP tools covering repository info, file operations, changelists, merge/resolve, review workflows, workflow composites, search, users/clients, jobs, labels/streams, analytics, and compliance.
-- Composite workflow tools are included to reduce request count and speed up common review/sync flows.
-- Includes both:
-  - `p4.diff` for workspace/local vs depot diff.
-  - `p4.diff2` for depot-to-depot server-side diff.
-- **Tool naming**: All tools use dot notation (e.g., `p4.changes`), but the server also accepts underscore notation (e.g., `p4_changes`) for compatibility with clients that transform tool names.
-
-## Documentation
-
-- Detailed tool reference: [docs/TOOLS_REFERENCE.md](docs/TOOLS_REFERENCE.md)
-- Docs index: [docs/README.md](docs/README.md)
-- IDE/client setup examples: [MCP_CONFIG_EXAMPLES.md](MCP_CONFIG_EXAMPLES.md)
-- Perforce setup notes: [PERFORCE_SETUP.md](PERFORCE_SETUP.md)
+- [PERFORCE_SETUP.md](PERFORCE_SETUP.md)
+- [MCP_CONFIG_EXAMPLES.md](MCP_CONFIG_EXAMPLES.md)
 
 ## Development
 
@@ -211,6 +182,21 @@ npm run build
 npm test
 npm run test:integration
 ```
+
+Current verification baseline:
+
+- `npm run build`
+- `npm test`
+- `npm run test:integration`
+
+## Documentation
+
+- Tool catalog and descriptions: [AGENTS.md](AGENTS.md)
+- Docs index: [docs/README.md](docs/README.md)
+- Perforce setup: [PERFORCE_SETUP.md](PERFORCE_SETUP.md)
+- MCP client config examples: [MCP_CONFIG_EXAMPLES.md](MCP_CONFIG_EXAMPLES.md)
+- Publishing workflow: [PUBLISHING.md](PUBLISHING.md)
+- Release notes draft: [RELEASE_NOTES.md](RELEASE_NOTES.md)
 
 ## License
 

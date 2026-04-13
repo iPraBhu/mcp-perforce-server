@@ -72,7 +72,7 @@ async function runIntegrationTests() {
       'p4Sync', 'p4Opened', 'p4Diff', 'p4Diff2', 'p4Integrate', 'p4Merge', 'p4Print', 'p4Fstat', 'p4Streams', 'p4Stream',
       'p4Resolve', 'p4Shelve', 'p4Unshelve',
       'p4Changes', 'p4Review', 'p4Reviews', 'p4Interchanges', 'p4Integrated', 'p4Blame', 'p4Annotate', 'p4Copy', 'p4Move', 'p4Grep', 'p4Files', 'p4Dirs',
-      'p4ReviewBundle', 'p4ChangeInspect', 'p4PathSyncCheck',
+      'p4ReviewBundle', 'p4ChangeInspect', 'p4PathSyncCheck', 'p4FileInspect', 'p4WorkspaceSnapshot', 'p4SearchInspect', 'p4ReviewPrepare',
       'p4ChangelistCreate', 'p4ChangelistUpdate', 'p4ChangelistSubmit', 'p4Submit', 'p4Describe',
       'p4Filelog', 'p4Clients', 'p4ConfigDetect',
       'p4Users', 'p4User', 'p4Client', 'p4Jobs', 'p4Job', 'p4Fixes',

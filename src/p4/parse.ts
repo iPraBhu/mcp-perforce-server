@@ -253,7 +253,7 @@ export function parseInterchangesOutput(output: string | any): ParsedRecord[] {
     }
 
     const headerMatch = line.match(
-      /^Change\s+(\d+)\s+on\s+(\S+)\s+by\s+(.+?)@(.+?)(?:\s+'(.*)')?$/
+      /^Change\s+(\d+)\s+on\s+(.+?)\s+by\s+(.+?)@(.+?)(?:\s+'(.*)')?$/
     );
     if (headerMatch) {
       finalizeCurrent();

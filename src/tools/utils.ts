@@ -6,6 +6,7 @@ import { P4Runner, P4RunResult } from '../p4/runner.js';
 import { P4Config, P4ServerConfig } from '../p4/config.js';
 import { SecurityManager } from '../p4/security.js';
 import * as parse from '../p4/parse.js';
+import { mergeStringArgs, sanitizeStringList } from './arg-utils.js';
 
 export interface ToolContext {
   runner: P4Runner;
@@ -19,9 +20,10 @@ export interface ToolContext {
  */
 export async function p4Filelog(
   context: ToolContext,
-  args: { filespec: string; maxRevisions?: number; workspacePath?: string }
+  args: { filespec?: string; filespecs?: string[]; maxRevisions?: number; workspacePath?: string }
 ): Promise<P4RunResult> {
-  if (!args.filespec) {
+  const filespecs = mergeStringArgs(args.filespec, args.filespecs);
+  if (filespecs.length === 0) {
     return {
       ok: false,
       command: 'filelog',
@@ -30,7 +32,22 @@ export async function p4Filelog(
       configUsed: {},
       error: {
         code: 'P4_INVALID_ARGS',
-        message: 'filespec parameter is required',
+        message: 'filespec or filespecs parameter is required',
+      },
+    };
+  }
+
+  const filespecValidation = sanitizeStringList(context.security, filespecs, 'filespec', 'filespecs');
+  if (!filespecValidation.valid) {
+    return {
+      ok: false,
+      command: 'filelog',
+      args: [],
+      cwd: process.cwd(),
+      configUsed: {},
+      error: {
+        code: 'P4_INVALID_ARGS',
+        message: filespecValidation.error || 'Invalid filespecs',
       },
     };
   }
@@ -41,7 +58,7 @@ export async function p4Filelog(
   if (args.maxRevisions && args.maxRevisions > 0) {
     cmdArgs.push('-m', args.maxRevisions.toString());
   }
-  cmdArgs.push(args.filespec);
+  cmdArgs.push(...(filespecValidation.values || []));
   
   const result = await context.runner.run('filelog', cmdArgs, cwd, {
     env,
