@@ -86,8 +86,8 @@ async function testComponents() {
     const capturedCalls = [];
     const batchContext = {
       runner: {
-        run: async (command, args, cwd) => {
-          capturedCalls.push({ command, args, cwd });
+        run: async (command, args, cwd, options = {}) => {
+          capturedCalls.push({ command, args, cwd, stdin: options.stdin });
           if (command === 'grep') {
             return {
               ok: true,
@@ -237,6 +237,18 @@ async function testComponents() {
       includeDiff: true,
       includeFileHistory: true,
     });
+    const changelistCreateResult = await tools.p4ChangelistCreate(batchContext, {
+      description: 'first line\nFiles:\n\t//depot/evil.txt',
+      files: ['//depot/main/file.txt'],
+    });
+    const submitResult = await tools.p4Submit(batchContext, {
+      description: 'ship it\nChange:\t999',
+      files: ['//depot/main/file.txt'],
+    });
+    const invalidChangelistCreateResult = await tools.p4ChangelistCreate(batchContext, {
+      description: 'safe description',
+      files: ['//depot/main/file.txt\nFiles:\n\t//depot/evil.txt'],
+    });
 
     const syncCall = capturedCalls.find((call) => call.command === 'sync');
     const openedCall = capturedCalls.find((call) => call.command === 'opened');
@@ -254,6 +266,8 @@ async function testComponents() {
     const infoCall = capturedCalls.filter((call) => call.command === 'info').pop();
     const grepCall = capturedCalls.filter((call) => call.command === 'grep').pop();
     const describeCall = capturedCalls.filter((call) => call.command === 'describe').pop();
+    const changeInputCall = capturedCalls.find((call) => call.command === 'change' && call.args.join('|') === '-i');
+    const submitInputCall = capturedCalls.find((call) => call.command === 'submit' && call.args.join('|') === '-i');
 
     if (syncCall && syncCall.args.join('|') === '//depot/main/...|//depot/release/...') {
       console.error('[TEST] âœ“ p4Sync forwards singular and plural filespec inputs together');
@@ -349,6 +363,36 @@ async function testComponents() {
       console.error('[TEST] p4ReviewPrepare builds review-ready inspection bundles');
     } else {
       console.error('[TEST] p4ReviewPrepare composite behavior failed');
+    }
+
+    if (
+      changelistCreateResult.ok &&
+      changeInputCall &&
+      typeof changeInputCall.stdin === 'string' &&
+      changeInputCall.stdin.includes('Description:\n\tfirst line\n\tFiles:\n\t\t//depot/evil.txt') &&
+      (changeInputCall.stdin.match(/\nFiles:\n/g) || []).length === 1
+    ) {
+      console.error('[TEST] p4ChangelistCreate indents multiline descriptions to prevent form-field injection');
+    } else {
+      console.error('[TEST] p4ChangelistCreate form-body escaping failed');
+    }
+
+    if (
+      submitResult.ok &&
+      submitInputCall &&
+      typeof submitInputCall.stdin === 'string' &&
+      submitInputCall.stdin.includes('Description:\n\tship it\n\tChange:\t999') &&
+      (submitInputCall.stdin.match(/\nChange:\t/g) || []).length === 1
+    ) {
+      console.error('[TEST] p4Submit indents multiline descriptions to keep injected fields inert');
+    } else {
+      console.error('[TEST] p4Submit form-body escaping failed');
+    }
+
+    if (!invalidChangelistCreateResult.ok && invalidChangelistCreateResult.error?.code === 'P4_INVALID_ARGS') {
+      console.error('[TEST] p4ChangelistCreate rejects file entries containing form control characters');
+    } else {
+      console.error('[TEST] p4ChangelistCreate file-entry validation failed');
     }
 
     // Parser behavior checks with representative script-mode output

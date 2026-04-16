@@ -14,6 +14,54 @@ export interface ToolContext {
   security: SecurityManager;
 }
 
+const FORM_CONTROL_CHAR_PATTERN = /[\0\r\n\t]/;
+
+function validateFormDescription(description: string): string | undefined {
+  if (description.includes('\0')) {
+    return 'description cannot contain null bytes';
+  }
+  return undefined;
+}
+
+function validateFormFiles(files?: string[]): string | undefined {
+  if (!files) {
+    return undefined;
+  }
+
+  if (!Array.isArray(files)) {
+    return 'files parameter must be an array';
+  }
+
+  if (files.length > 1000) {
+    return 'too many files (maximum 1000)';
+  }
+
+  for (const file of files) {
+    if (typeof file !== 'string' || file.length === 0 || file.length > 4096) {
+      return 'invalid file path in files array';
+    }
+    if (FORM_CONTROL_CHAR_PATTERN.test(file)) {
+      return 'file paths cannot contain tabs, carriage returns, newlines, or null bytes';
+    }
+  }
+
+  return undefined;
+}
+
+function sanitizeSingleLineFormValue(value: string | undefined, fallback: string): string {
+  if (typeof value !== 'string') {
+    return fallback;
+  }
+
+  const sanitized = value.replace(/[\0\r\n\t]+/g, ' ').trim();
+  return sanitized || fallback;
+}
+
+function formatFormBlock(value: string): string[] {
+  const normalized = value.replace(/\r\n?/g, '\n').replace(/\0/g, '');
+  return normalized.split('\n').map((line) => `\t${line}`);
+}
+
 /**
  * p4 changelist.create - Create a new changelist
  */
@@ -21,7 +69,6 @@ export async function p4ChangelistCreate(
   context: ToolContext,
   args: { description: string; files?: string[]; workspacePath?: string }
 ): Promise<P4RunResult> {
-  // Validate description
   if (!args.description || typeof args.description !== 'string') {
     return {
       ok: false,
@@ -64,54 +111,36 @@ export async function p4ChangelistCreate(
     };
   }
 
-  // Validate files if provided
-  if (args.files) {
-    if (!Array.isArray(args.files)) {
-      return {
-        ok: false,
-        command: 'change',
-        args: [],
-        cwd: process.cwd(),
-        configUsed: {},
-        error: {
-          code: 'P4_INVALID_ARGS',
-          message: 'files parameter must be an array',
-        },
-      };
-    }
-
-    if (args.files.length > 1000) {
-      return {
-        ok: false,
-        command: 'change',
-        args: [],
-        cwd: process.cwd(),
-        configUsed: {},
-        error: {
-          code: 'P4_INVALID_ARGS',
-          message: 'too many files (maximum 1000)',
-        },
-      };
-    }
-
-    for (const file of args.files) {
-      if (typeof file !== 'string' || file.length === 0 || file.length > 4096) {
-        return {
-          ok: false,
-          command: 'change',
-          args: [],
-          cwd: process.cwd(),
-          configUsed: {},
-          error: {
-            code: 'P4_INVALID_ARGS',
-            message: 'invalid file path in files array',
-          },
-        };
-      }
-    }
+  const descriptionValidationError = validateFormDescription(args.description);
+  if (descriptionValidationError) {
+    return {
+      ok: false,
+      command: 'change',
+      args: [],
+      cwd: process.cwd(),
+      configUsed: {},
+      error: {
+        code: 'P4_INVALID_ARGS',
+        message: descriptionValidationError,
+      },
+    };
   }
 
-  // Validate workspace path
+  const filesValidationError = validateFormFiles(args.files);
+  if (filesValidationError) {
+    return {
+      ok: false,
+      command: 'change',
+      args: [],
+      cwd: process.cwd(),
+      configUsed: {},
+      error: {
+        code: 'P4_INVALID_ARGS',
+        message: filesValidationError,
+      },
+    };
+  }
+
   if (args.workspacePath && (typeof args.workspacePath !== 'string' || args.workspacePath.length > 4096)) {
     return {
       ok: false,
@@ -139,32 +168,30 @@ export async function p4ChangelistCreate(
       },
     };
   }
-  
+
   const { cwd, env, configResult } = await context.config.setupForCommand(args.workspacePath);
-  
+
   try {
-    // Create changelist spec
     const spec = createChangelistSpec({
       description: args.description,
       files: args.files,
       user: env.P4USER,
       client: env.P4CLIENT,
     });
-    
+
     const result = await context.runner.run('change', ['-i'], cwd, {
       env,
       useZtag: false,
       parseOutput: false,
       stdin: spec,
     });
-      
+
     result.configUsed = {
       ...result.configUsed,
       p4configPath: configResult.configPath,
     };
-      
+
     if (result.ok && result.result) {
-      // Parse changelist number from output
       const match = (result.result as string).match(/Change (\d+) created/);
       if (match) {
         result.result = {
@@ -174,7 +201,7 @@ export async function p4ChangelistCreate(
         };
       }
     }
-      
+
     return result;
   } catch (error) {
     return {
@@ -225,9 +252,55 @@ export async function p4ChangelistUpdate(
       },
     };
   }
-  
+
+  if (args.description !== undefined) {
+    if (typeof args.description !== 'string') {
+      return {
+        ok: false,
+        command: 'change',
+        args: [],
+        cwd: process.cwd(),
+        configUsed: {},
+        error: {
+          code: 'P4_INVALID_ARGS',
+          message: 'description must be a string',
+        },
+      };
+    }
+
+    const descriptionValidationError = validateFormDescription(args.description);
+    if (descriptionValidationError) {
+      return {
+        ok: false,
+        command: 'change',
+        args: [],
+        cwd: process.cwd(),
+        configUsed: {},
+        error: {
+          code: 'P4_INVALID_ARGS',
+          message: descriptionValidationError,
+        },
+      };
+    }
+  }
+
+  const filesValidationError = validateFormFiles(args.files);
+  if (filesValidationError) {
+    return {
+      ok: false,
+      command: 'change',
+      args: [],
+      cwd: process.cwd(),
+      configUsed: {},
+      error: {
+        code: 'P4_INVALID_ARGS',
+        message: filesValidationError,
+      },
+    };
+  }
+
   const { cwd, env, configResult } = await context.config.setupForCommand(args.workspacePath);
-  
+
   try {
     // First get the current changelist to preserve existing data
     const describeResult = await context.runner.run('describe', ['-s', args.changelist], cwd, {
@@ -370,7 +443,7 @@ export async function p4Submit(
       },
     };
   }
-  
+
   if (context.serverConfig.readOnlyMode) {
     return {
       ok: false,
@@ -384,30 +457,58 @@ export async function p4Submit(
       },
     };
   }
-  
+
+  const descriptionValidationError = validateFormDescription(args.description);
+  if (descriptionValidationError) {
+    return {
+      ok: false,
+      command: 'submit',
+      args: [],
+      cwd: process.cwd(),
+      configUsed: {},
+      error: {
+        code: 'P4_INVALID_ARGS',
+        message: descriptionValidationError,
+      },
+    };
+  }
+
+  const filesValidationError = validateFormFiles(args.files);
+  if (filesValidationError) {
+    return {
+      ok: false,
+      command: 'submit',
+      args: [],
+      cwd: process.cwd(),
+      configUsed: {},
+      error: {
+        code: 'P4_INVALID_ARGS',
+        message: filesValidationError,
+      },
+    };
+  }
+
   const { cwd, env, configResult } = await context.config.setupForCommand(args.workspacePath);
-  
+
   try {
-    // Create submit spec
     const spec = createSubmitSpec({
       description: args.description,
       files: args.files,
     });
-    
+
     const result = await context.runner.run('submit', ['-i'], cwd, {
       env,
       useZtag: false,
       parseOutput: false,
       stdin: spec,
     });
-      
+
     result.configUsed = {
       ...result.configUsed,
       p4configPath: configResult.configPath,
     };
-      
+
     if (result.ok && result.result) {
-      // Parse submit result
       const match = (result.result as string).match(/Change (\d+) submitted/);
       if (match) {
         result.result = {
@@ -417,7 +518,7 @@ export async function p4Submit(
         };
       }
     }
-      
+
     return result;
   } catch (error) {
     return {
@@ -491,7 +592,7 @@ export async function p4Describe(
       },
     };
   }
-  
+
   const { cwd, env, configResult } = await context.config.setupForCommand(args.workspacePath);
 
   const includeDiff = args.includeDiff === true;
@@ -503,7 +604,7 @@ export async function p4Describe(
     useZtag: false,
     parseOutput: false,
   });
-  
+
   if (result.ok && typeof result.result === 'string' && result.result.trim().length > 0) {
     try {
       result.result = parse.parseDescribeOutput(result.result);
@@ -522,12 +623,12 @@ export async function p4Describe(
       rawText: '',
     };
   }
-  
+
   result.configUsed = {
     ...result.configUsed,
     p4configPath: configResult.configPath,
   };
-  
+
   return result;
 }
 
@@ -553,16 +654,16 @@ function createChangelistSpec(options: {
     '# Files: What opened files from the default changelist are to be added',
     '#\tto this changelist. You may delete files from this list.',
     '',
-    `Change:\t${options.changelist || 'new'}`,
+    `Change:\t${sanitizeSingleLineFormValue(options.changelist, 'new')}`,
     '',
-    `Client:\t${options.client || 'unknown'}`,
+    `Client:\t${sanitizeSingleLineFormValue(options.client, 'unknown')}`,
     '',
-    `User:\t${options.user || 'unknown'}`,
+    `User:\t${sanitizeSingleLineFormValue(options.user, 'unknown')}`,
     '',
     'Status:\tnew',
     '',
     'Description:',
-    `\t${options.description}`,
+    ...formatFormBlock(options.description),
     '',
     'Files:',
   ];
@@ -572,7 +673,7 @@ function createChangelistSpec(options: {
       lines.push(`\t${file}`);
     }
   }
-  
+
   return lines.join('\n');
 }
 
@@ -594,7 +695,7 @@ function createSubmitSpec(options: {
     'Change:\tnew',
     '',
     'Description:',
-    `\t${options.description}`,
+    ...formatFormBlock(options.description),
     '',
     'Files:',
   ];
