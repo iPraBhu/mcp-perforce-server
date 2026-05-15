@@ -1,6 +1,6 @@
 {
   "name": "mcp-perforce-server",
-  "version": "3.2.0",
+  "version": "3.3.0",
   "description": "Enterprise-grade MCP (Model Context Protocol) server for Perforce P4 integration with AI assistants. Includes 59 MCP tools, native-style batch and flag support, rich review/search workflow helpers, and comprehensive security controls such as audit logging, rate limiting, input sanitization, and compliance reporting.",
   "main": "dist/server.js",
   "bin": {
