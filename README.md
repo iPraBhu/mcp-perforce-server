@@ -19,9 +19,8 @@ It is designed for AI assistants and IDE integrations that need Perforce access 
 - Batch-capable inputs for the tool surface where native `p4` supports multi-target usage.
 - MCP-specific composite helpers that reduce round trips for common review and search workflows.
 - Structured responses with `ok`, `result`, optional `error`, optional `warnings`, and `configUsed`.
-- Compatibility with both dot and underscore tool naming:
-  - `p4.changes`
-  - `p4_changes`
+- MCP clients see underscore-safe tool names, for example `p4_changes`.
+- Incoming calls also accept the historical dotted names, for example `p4.changes`.
 
 ## Highlighted Workflows
 

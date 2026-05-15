@@ -121,6 +121,8 @@ const TOOL_HANDLERS: Record<string, ToolHandler> = {
   'p4.compliance': tools.p4Compliance as ToolHandler,
 };
 
+const toClientToolName = (toolName: string): string => toolName.replace(/\./g, '_');
+
 const WRITE_TOOLS = new Set<string>([
   'p4.add',
   'p4.edit',
@@ -2496,7 +2498,7 @@ class MCPPerforceServer {
               additionalProperties: false,
             },
           },
-        ],
+        ].map((tool) => ({ ...tool, name: toClientToolName(tool.name) })),
       };
     });
 

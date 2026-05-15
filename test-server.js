@@ -14,6 +14,7 @@ async function testComponents() {
     const { SecurityManager } = require('./dist/p4/security.js');
     const parse = require('./dist/p4/parse.js');
     const tools = require('./dist/tools/index.js');
+    const { MCPPerforceServer } = require('./dist/server.js');
     
     console.error('[TEST] ✓ All core components imported successfully');
     
@@ -80,6 +81,20 @@ async function testComponents() {
       } else {
         console.error(`[TEST] ✗ Tool ${toolName} is missing`);
       }
+    }
+    
+    // Test MCP-advertised tool names are compatible with clients that only accept
+    // alphanumeric characters and underscores.
+    const mcpServer = new MCPPerforceServer();
+    const listToolsHandler = mcpServer.server._requestHandlers.get('tools/list');
+    const listedTools = await listToolsHandler({ method: 'tools/list', params: {} }, {});
+    const invalidToolNames = listedTools.tools
+      .map((tool) => tool.name)
+      .filter((name) => !/^[A-Za-z0-9_]+$/.test(name));
+    if (invalidToolNames.length === 0) {
+      console.error('[TEST] MCP tool names are client-safe');
+    } else {
+      throw new Error(`MCP tool names must be alphanumeric/underscore only: ${invalidToolNames.join(', ')}`);
     }
     
     // Batch argument support checks

@@ -6,6 +6,7 @@ This document contains the detailed reference for all MCP tools exposed by this 
 
 - All tools return structured JSON (`ok`, `result`, optional `error`, optional `warnings`, `configUsed`).
 - Most tools accept `workspacePath` (optional) to control where `.p4config` is discovered.
+- MCP clients are advertised underscore-safe tool names such as `p4_changes`; the dotted names below remain accepted as backward-compatible aliases.
 
 Safety controls:
 

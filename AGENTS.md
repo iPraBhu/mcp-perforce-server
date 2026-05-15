@@ -2,6 +2,8 @@
 
 This document describes all available agents (tools) provided by the MCP Perforce Server. Each agent corresponds to a specific Perforce operation that can be invoked through the Model Context Protocol.
 
+MCP clients are advertised underscore-safe tool names such as `p4_changes`; the dotted names below remain accepted as backward-compatible aliases.
+
 ## Agent Categories
 
 ### Repository Operations
