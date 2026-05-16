@@ -201,6 +201,8 @@ Replace `command` with `node` and point `args` at your built server:
 
 ## SSE Transport (HTTP Server Mode)
 
+> **📘 For comprehensive SSE deployment guide including Docker, Kubernetes, production setup, and troubleshooting, see [SSE_SETUP_GUIDE.md](SSE_SETUP_GUIDE.md)**
+
 The SSE (Server-Sent Events) transport runs an HTTP server for web-based clients instead of stdio pipes for IDE integration.
 
 ### Starting the SSE Server

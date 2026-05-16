@@ -172,7 +172,11 @@ export P4_READONLY_MODE=true
 mcp-perforce-server --transport=sse
 ```
 
-See [MCP_CONFIG_EXAMPLES.md](MCP_CONFIG_EXAMPLES.md) for Docker and advanced SSE configurations.
+**📘 For complete SSE deployment guide, see [SSE_SETUP_GUIDE.md](SSE_SETUP_GUIDE.md)**
+
+Quick references:
+- [MCP Configuration Examples](MCP_CONFIG_EXAMPLES.md) - Quick config snippets
+- [SSE Setup Guide](SSE_SETUP_GUIDE.md) - Comprehensive deployment guide with Docker, Kubernetes, and production examples
 
 ## Safety Model
 
@@ -257,6 +261,7 @@ Current verification baseline:
 
 ## Documentation
 
+- **SSE Transport Setup**: [SSE_SETUP_GUIDE.md](SSE_SETUP_GUIDE.md) - Complete guide for HTTP/web deployments
 - Tool catalog and descriptions: [AGENTS.md](AGENTS.md)
 - Docs index: [docs/README.md](docs/README.md)
 - Perforce setup: [PERFORCE_SETUP.md](PERFORCE_SETUP.md)

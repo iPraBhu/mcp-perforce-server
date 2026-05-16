@@ -2,6 +2,7 @@
 
 ## Core Docs
 
+- **SSE Transport Setup**: [../SSE_SETUP_GUIDE.md](../SSE_SETUP_GUIDE.md) - Complete guide for HTTP/web deployments with Docker, Kubernetes, and production examples
 - Tool reference (all tools, parameters, behavior): [TOOLS_REFERENCE.md](TOOLS_REFERENCE.md)
 - MCP config examples for popular clients/IDEs: [../MCP_CONFIG_EXAMPLES.md](../MCP_CONFIG_EXAMPLES.md)
 - Perforce environment setup notes: [../PERFORCE_SETUP.md](../PERFORCE_SETUP.md)
