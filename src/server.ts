@@ -13,6 +13,7 @@ import { P4Runner } from './p4/runner.js';
 import { P4Config, P4ServerConfig } from './p4/config.js';
 import { SecurityManager, securityManager } from './p4/security.js';
 import * as tools from './tools/index.js';
+import { SSETransportManager, SSETransportOptions } from './transports/sse.js';
 
 // Environment-based logging
 const LOG_LEVEL = process.env.LOG_LEVEL || 'warn';
@@ -2605,11 +2606,18 @@ class MCPPerforceServer {
     });
   }
 
-  async run(): Promise<void> {
-    const transport = new StdioServerTransport();
-    log.info('Starting MCP Perforce server...');
-    await this.server.connect(transport);
-    log.info('MCP Perforce server running');
+  async run(transportType: 'stdio' | 'sse' = 'stdio', sseOptions?: SSETransportOptions): Promise<void> {
+    if (transportType === 'sse') {
+      log.info('Starting MCP Perforce server with SSE transport...');
+      const sseManager = new SSETransportManager(this.server, sseOptions);
+      await sseManager.start();
+      log.info('MCP Perforce server running with SSE transport');
+    } else {
+      const transport = new StdioServerTransport();
+      log.info('Starting MCP Perforce server with stdio transport...');
+      await this.server.connect(transport);
+      log.info('MCP Perforce server running with stdio transport');
+    }
   }
 }
 
@@ -2632,9 +2640,24 @@ MCP Perforce Server v${packageJson.version}
 A production-ready MCP (Model Context Protocol) server for Perforce operations.
 
 Usage:
-  mcp-perforce-server          Start the MCP server (stdio transport)
-  mcp-perforce-server --help   Show this help message
-  mcp-perforce-server --version Show version information
+  mcp-perforce-server                    Start the MCP server (stdio transport, default)
+  mcp-perforce-server --transport=sse    Start with SSE transport (HTTP server)
+  mcp-perforce-server --help             Show this help message
+  mcp-perforce-server --version          Show version information
+
+Transport Options:
+  --transport=stdio       Use stdio transport (default, for IDE/CLI integration)
+  --transport=sse         Use SSE transport (HTTP server for web clients)
+  
+  MCP_TRANSPORT=sse       Environment variable to set transport type
+
+SSE Transport Configuration (only for --transport=sse):
+  MCP_SSE_PORT=3000                      HTTP server port (default: 3000)
+  MCP_SSE_HOST=0.0.0.0                   HTTP server host (default: 0.0.0.0)
+  MCP_SSE_PATH=/mcp                      SSE endpoint path (default: /mcp)
+  MCP_SSE_CORS_ORIGIN=*                  CORS origin (default: *)
+  MCP_SSE_ENABLE_AUTH=true               Enable Bearer token authentication (default: false)
+  MCP_SSE_AUTH_TOKEN=your-secret-token   Authentication token when auth is enabled
 
 Environment Variables:
   P4_READONLY_MODE=false      Enable write operations (default: read-only enabled)
@@ -2683,8 +2706,19 @@ For more information: https://github.com/iPraBhu/mcp-perforce-server
     process.exit(0);
   }
 
+  // Determine transport type
+  const transportArg = process.argv.find(arg => arg.startsWith('--transport='));
+  const transportType = transportArg 
+    ? transportArg.split('=')[1] as 'stdio' | 'sse'
+    : (process.env.MCP_TRANSPORT as 'stdio' | 'sse') || 'stdio';
+
+  if (transportType !== 'stdio' && transportType !== 'sse') {
+    console.error(`Invalid transport type: ${transportType}. Must be 'stdio' or 'sse'.`);
+    process.exit(1);
+  }
+
   const server = new MCPPerforceServer();
-  server.run().catch((error) => {
+  server.run(transportType).catch((error) => {
     log.error('Failed to start server:', error);
     process.exit(1);
   });

@@ -9,7 +9,9 @@
   "scripts": {
     "build": "tsc",
     "dev": "tsc && node dist/server.js",
+    "dev:sse": "tsc && node dist/server.js --transport=sse",
     "start": "node dist/server.js",
+    "start:sse": "node dist/server.js --transport=sse",
     "watch": "tsc --watch",
     "clean": "rimraf dist",
     "test": "node test-server.js",
@@ -98,10 +100,14 @@
     "LICENSE"
   ],
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.25.3"
+    "@modelcontextprotocol/sdk": "^1.25.3",
+    "express": "^4.21.2",
+    "cors": "^2.8.5"
   },
   "devDependencies": {
     "@types/node": "^25.0.10",
+    "@types/express": "^5.0.0",
+    "@types/cors": "^2.8.17",
     "rimraf": "^5.0.10",
     "typescript": "^5.7.2"
   },

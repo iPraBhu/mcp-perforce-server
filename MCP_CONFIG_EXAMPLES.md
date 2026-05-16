@@ -199,6 +199,101 @@ Replace `command` with `node` and point `args` at your built server:
 }
 ```
 
+## SSE Transport (HTTP Server Mode)
+
+The SSE (Server-Sent Events) transport runs an HTTP server for web-based clients instead of stdio pipes for IDE integration.
+
+### Starting the SSE Server
+
+```bash
+# Via command-line flag
+mcp-perforce-server --transport=sse
+
+# Via environment variable
+MCP_TRANSPORT=sse mcp-perforce-server
+
+# With custom port
+MCP_SSE_PORT=8080 mcp-perforce-server --transport=sse
+```
+
+### SSE Configuration Options
+
+| Variable | Default | Description |
+|---|---|---|
+| `MCP_SSE_PORT` | `3000` | HTTP server port |
+| `MCP_SSE_HOST` | `0.0.0.0` | HTTP server host (0.0.0.0 for all interfaces) |
+| `MCP_SSE_PATH` | `/mcp` | SSE endpoint path |
+| `MCP_SSE_CORS_ORIGIN` | `*` | CORS origin (use specific domain in production) |
+| `MCP_SSE_ENABLE_AUTH` | `false` | Enable Bearer token authentication |
+| `MCP_SSE_AUTH_TOKEN` | _(empty)_ | Authentication token when auth is enabled |
+
+### SSE Endpoints
+
+When running in SSE mode:
+
+- **Main SSE endpoint**: `GET http://localhost:3000/mcp`
+- **Health check**: `GET http://localhost:3000/health`
+- **Message posting**: `POST http://localhost:3000/mcp`
+
+### SSE with Authentication (Production)
+
+```bash
+# Set authentication token
+export MCP_SSE_ENABLE_AUTH=true
+export MCP_SSE_AUTH_TOKEN="your-secret-token-here"
+export MCP_SSE_CORS_ORIGIN="https://your-dashboard.com"
+export MCP_SSE_PORT=3000
+
+# Start server
+mcp-perforce-server --transport=sse
+```
+
+Client requests must include:
+```
+Authorization: Bearer your-secret-token-here
+```
+
+### SSE with Docker
+
+```dockerfile
+FROM node:18-alpine
+RUN npm install -g mcp-perforce-server
+ENV MCP_TRANSPORT=sse
+ENV MCP_SSE_PORT=3000
+ENV MCP_SSE_HOST=0.0.0.0
+ENV P4_READONLY_MODE=true
+ENV P4_DISABLE_DELETE=true
+EXPOSE 3000
+CMD ["mcp-perforce-server"]
+```
+
+Run:
+```bash
+docker run -p 3000:3000 \
+  -e P4PORT=perforce-server:1666 \
+  -e P4USER=your-username \
+  -e P4CLIENT=your-workspace \
+  your-image-name
+```
+
+### SSE Use Cases
+
+- **Web dashboards**: Real-time Perforce analytics and monitoring
+- **Code review UIs**: Browser-based changelist inspection
+- **Team collaboration**: Multi-user workspace status views
+- **API integrations**: HTTP-based Perforce automation
+- **Compliance reporting**: Centralized audit log viewers
+
+### SSE vs Stdio Transport
+
+| Feature | Stdio | SSE |
+|---|---|---|
+| **Use case** | IDE/CLI integration | Web clients, dashboards |
+| **Connection** | Process pipes | HTTP streaming |
+| **Multi-user** | One process per client | Shared HTTP server |
+| **Authentication** | Process isolation | Token-based (optional) |
+| **Deployment** | Local/per-user | Centralized server |
+
 ## Safety Profile Used In This Document
 
 | Profile | `P4_READONLY_MODE` | `P4_DISABLE_DELETE` | Behavior |

@@ -13,6 +13,7 @@ It is designed for AI assistants and IDE integrations that need Perforce access 
 ## What It Provides
 
 - 59 MCP tools across repository inspection, file operations, changelists, reviews, jobs, labels, streams, analytics, and compliance.
+- Dual transport support: stdio (IDE/CLI) and SSE (HTTP server for web clients).
 - Safe-by-default runtime behavior:
   - `P4_READONLY_MODE=true`
   - `P4_DISABLE_DELETE=true`
@@ -106,6 +107,72 @@ Windows local-repo example:
   }
 }
 ```
+
+## Transport Modes
+
+The server supports two transport modes:
+
+### Stdio Transport (Default)
+
+Standard input/output transport for IDE and CLI integration. Each MCP client spawns its own server process.
+
+**Best for:**
+- VS Code, Cursor, Claude Desktop integration
+- CLI tools and local automation
+- Single-user workflows
+- Process-isolated security model
+
+```bash
+# Default mode (no flag needed)
+mcp-perforce-server
+```
+
+### SSE Transport (HTTP Server)
+
+Server-Sent Events transport runs an HTTP server for web-based clients.
+
+**Best for:**
+- Web dashboards and analytics UIs
+- Team collaboration tools
+- Centralized deployments
+- Multi-user environments
+- API integrations
+
+```bash
+# Start SSE server
+mcp-perforce-server --transport=sse
+
+# With custom configuration
+MCP_SSE_PORT=8080 MCP_SSE_ENABLE_AUTH=true mcp-perforce-server --transport=sse
+```
+
+**SSE Configuration:**
+
+| Variable | Default | Description |
+|---|---|---|
+| `MCP_SSE_PORT` | `3000` | HTTP server port |
+| `MCP_SSE_HOST` | `0.0.0.0` | Server bind address |
+| `MCP_SSE_PATH` | `/mcp` | SSE endpoint path |
+| `MCP_SSE_CORS_ORIGIN` | `*` | CORS allowed origins |
+| `MCP_SSE_ENABLE_AUTH` | `false` | Enable token authentication |
+| `MCP_SSE_AUTH_TOKEN` | _(empty)_ | Bearer token for auth |
+
+**SSE Endpoints:**
+- Main: `GET http://localhost:3000/mcp`
+- Health: `GET http://localhost:3000/health`
+- Post: `POST http://localhost:3000/mcp`
+
+**Production SSE Example:**
+
+```bash
+export MCP_SSE_ENABLE_AUTH=true
+export MCP_SSE_AUTH_TOKEN="your-secret-token"
+export MCP_SSE_CORS_ORIGIN="https://your-dashboard.com"
+export P4_READONLY_MODE=true
+mcp-perforce-server --transport=sse
+```
+
+See [MCP_CONFIG_EXAMPLES.md](MCP_CONFIG_EXAMPLES.md) for Docker and advanced SSE configurations.
 
 ## Safety Model
 
